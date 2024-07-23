@@ -136,7 +136,7 @@ df_byYear <- df_cleanCol|>
   arrange(year_of_inspection)
 
   #create a table with columns year_of_inspection and mean number of violations per restaurant
-df_year_vs_violations <- summarise(group_by(df_byYear, year_of_inspection), sum(score)/n())
+df_year_vs_violations <- summarise(group_by(df_byYear, year_of_inspection), mean(score))
   
   #create scatter plot
 df_year_vs_violations|>
