@@ -42,6 +42,7 @@ df_2023|>
 #HOW MUCH DOES THE GRADING IN DIFFERENT BOROUGHS DIFFER BY?
 
 #PIE CHARTS COMPARING GRADE PROPORTIONS IN NYC BOROUGHS
+
 #PIE CHARTS
   #Pie Chart for proportion of valid grades in New York in 2023####
 df_ny <- df_2023 |>
@@ -117,7 +118,7 @@ pie(counts, main = "Grade of Restaurants in Staten Island", labels = grade)
 
 #CHECKING FOR ANOMALOUS ENTRIES
 
-#Checking whether a restaurant is graded and has a value that is N/A and vice versa####
+#Checking whether a restaurant is graded AND has a grade value that is N/A, and vice versa####
 df_graded_irregularly <- df_cleanCol|>
   filter(!is.na(grade), inspection_date == "01/01/1900")
 
@@ -130,6 +131,8 @@ df_graded_irregularly
 
 
 #HOW HAVE THE NUMBER OF VIOLATIONS PER RESTAURANT CHANGED OVER THE LAST FEW YEARS?
+
+#DISCOVERING IRREGULARITIES IN DATA AMOUNT VS. TIME DISTRIBUTION
 #average number of violation counts per in New York vs. year####
   #filter NA placeholders from both variables and arrange dataframe by year of inspection
 df_byYear <- df_cleanCol|>
@@ -151,6 +154,7 @@ df_year_vs_violations|>
 plot_byYear <- df_cleanCol|>
   separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
   select(!c("day","month"))|>
+  filter(year_of_inspection != "1900")|>
   ggplot(aes(year_of_inspection)) + geom_bar() + labs(title = "Year of Inspection vs. Count", x = "Year of Inspection", y = "Count")
 
 plot_byYear
@@ -158,15 +162,36 @@ plot_byYear
 
 
 
-#map of new york####
+
+
+#FINDING CORRELATION BETWEEN LOATION AND TYPE OF VIOLATION
+#map of new york restaurants####
 #plot data for a specific year and violation code type
 df_cleanCol|>
   separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
-  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, violation_code == "04K", boro == "Manhattan")|>
+  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, violation_code == "04L", boro == "Staten Island")|>
   ggplot(aes(x = longitude, y = latitude, color = boro)) + geom_point()
 
 #How many restaurants fit that criteria
 df_cleanCol|>
   separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
-  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, violation_code == "04H")|>
+  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, violation_code == "04K", boro == "Manhattan")|>
   nrow()
+
+#Average number of violations per restaurant for each zipcode in a borough####
+df_cleanCol |>
+  separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
+  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, violation_code == "04L")|>
+  group_by(zipcode) |>
+  summarise(mean_score = mean(score, na.rm = TRUE))|>
+  ggplot(aes(x = factor(zipcode), y = mean_score)) + geom_histogram(stat = "identity")
+
+  # On the map: restaurants in 2023 whose inspection scores are above 60
+df_cleanCol|>
+  separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
+  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, boro == "Manhattan", score >= 60)|>
+  ggplot(aes(x = longitude, y = latitude, color = boro)) + geom_point()
+
+
+
+
