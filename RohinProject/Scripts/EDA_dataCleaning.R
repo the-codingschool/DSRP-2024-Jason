@@ -195,3 +195,17 @@ df_cleanCol|>
 
 
 
+
+
+#Replace NA Placeholders with NA itself####
+df_clean <- df_cleanCol|>
+  mutate(inspection_date = ifelse(inspection_date == "01/01/1900", NA, inspection_date))|>
+  filter(!is.na(inspection_date))|>
+  separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
+  filter(year_of_inspection >= 2022)|>
+  select(!c("community_board", "council_district", "census_tract", "bin", "bbl", "nta", "location_point1", "phone"))|>
+  mutate(longitude = ifelse(longitude == 0, NA, longitude))|>
+  mutate(latitude = ifelse(latitude == 0, NA, latitude))|>
+  mutate(action = ifelse(action == "No violations were recorded at the time of this inspection.", NA, action))
+
+df_clean
