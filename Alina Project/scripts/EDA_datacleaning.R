@@ -45,19 +45,40 @@ nrow(subset(data_clean, score <120)) - nrow(subset(data_clean, score <60))
 nrow(subset(data_clean, score <168)) - nrow(subset(data_clean, score <120))
 
 #ggplot/histograms/box plots/ bar graphs/ pie charts/ scatterplots/ line graphs from data
-  # restarunts per borough per year  
+  # distributions of scores
+ggplot(data = data_clean, aes(score)) + geom_histogram(bins = 70)+
+  labs(title = "distribution of scores of restaurants overall", x = "score",y = "count")
+
+  # restaurants per borough per year
+library(tidyr)
+
     # 2024
+data_sep <-separate(data_clean, col=inspection_date, into=c("day", "month", "year"), sep = "/")
+data_sep%>%filter(year == 2024)
+ggplot(data_sep, aes(x = boro)) + geom_bar() + labs(title = "number or restaurants per borough in 2024", x = "boroughs",y = "count")
 
     # 2023
+data_sep%>%filter(year == 2023)
+ggplot(data_sep, aes(x = boro)) + geom_bar() + labs(title = "number or restaurants per borough in 2023", x = "boroughs",y = "count")
 
     # 2022
+data_sep%>%filter(year == 2022)
+ggplot(data_sep, aes(x = boro)) + geom_bar() + labs(title = "number or restaurants per borough in 2022", x = "boroughs",y = "count")
 
     # 2021
+data_sep%>%filter(year == 2021)
+ggplot(data_sep, aes(x = boro)) + geom_bar() + labs(title = "number or restaurants per borough in 2021", x = "boroughs",y = "count")
 
     # 2020
+data_sep%>%filter(year == 2020)
+ggplot(data_sep, aes(x = boro)) + geom_bar() + labs(title = "number or restaurants per borough in 2020", x = "boroughs",y = "count")
 
     # 2019
+data_sep%>%filter(year == 2019)
+ggplot(data_sep, aes(x = boro)) + geom_bar() + labs(title = "number or restaurants per borough in 2019", x = "boroughs",y = "count")
 
     # 2018
+data_sep%>%filter(year == 2018)
+ggplot(data_sep, aes(x = boro)) + geom_bar() + labs(title = "number or restaurants per borough in 2018", x = "boroughs",y = "count")
 
 
