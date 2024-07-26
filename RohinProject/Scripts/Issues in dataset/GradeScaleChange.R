@@ -37,13 +37,14 @@ df_byYear <- df_cleanCol|>
   separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
   filter(year_of_inspection != 1900, !is.na(score), score != "NA")|>
   arrange(year_of_inspection)
+  
 
 #create a table with columns year_of_inspection and mean number of violations per restaurant
 df_year_vs_violations <- summarise(group_by(df_byYear, year_of_inspection), mean(score))
 
 #create scatter plot
 df_year_vs_violations|>
-  ggplot(aes(year_of_inspection, `mean(score)`)) + geom_point()
+  ggplot(aes(year_of_inspection, `mean(score)`)) + geom_point() + labs(x = "Year of Inspection", y = "Mean Score per Inspection", title = "Mean Score per Inspection")
 
 
 
@@ -54,6 +55,7 @@ plot_byYear <- df_cleanCol|>
   ggplot(aes(year_of_inspection, fill = factor(boro))) + geom_bar() + labs(title = "Year of Inspection vs. Count", x = "Year of Inspection", y = "Count")
 
 plot_byYear
+
 
 
 

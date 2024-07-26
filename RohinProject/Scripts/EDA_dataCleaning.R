@@ -165,12 +165,17 @@ plot_byYear
 
 
 #FINDING CORRELATION BETWEEN LOATION AND TYPE OF VIOLATION
-#map of new york restaurants####
-#plot data for a specific year and violation code type
+#map of new york restaurants in 2023####
+  #plot data for a specific year and violation code type
+    #04K: rats
+    #04L: mice
+    #04M: roaches
+    #04N: Flies
 df_cleanCol|>
   separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
-  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, violation_code == "04L", boro == "Staten Island")|>
+  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, violation_code == "04K", boro == "Manhattan")|>
   ggplot(aes(x = longitude, y = latitude, color = boro)) + geom_point()
+
 
 #How many restaurants fit that criteria
 df_cleanCol|>
@@ -197,15 +202,41 @@ df_cleanCol|>
 
 
 
-#Replace NA Placeholders with NA itself####
+#CLEAN DATA####
+  #remove rows that have grade and inspection date that are NA, and filter out years that are not 2023
 df_clean <- df_cleanCol|>
   mutate(inspection_date = ifelse(inspection_date == "01/01/1900", NA, inspection_date))|>
   filter(!is.na(inspection_date))|>
-  separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
-  filter(year_of_inspection >= 2022)|>
-  select(!c("community_board", "council_district", "census_tract", "bin", "bbl", "nta", "location_point1", "phone"))|>
+  filter(!is.na(grade), grade != "N")|>
+  separate(inspection_date, into = c("day", "month", "year_of_inspection"), sep = "/")|>
+  filter(year_of_inspection == 2023)
+  
+  #remove unneccesary columns
+df_clean <- df_clean |>
+  select(!c("community_board", "council_district", "census_tract", "bin", "bbl", "nta", "location_point1", "phone", "grade_date"))
+
+  #Convert NA placeholder values to NA
+df_clean <- df_clean |>
   mutate(longitude = ifelse(longitude == 0, NA, longitude))|>
   mutate(latitude = ifelse(latitude == 0, NA, latitude))|>
-  mutate(action = ifelse(action == "No violations were recorded at the time of this inspection.", NA, action))
+  mutate(action = ifelse(action == "No violations were recorded at the time of this inspection.", NA, action))|>
+  filter(boro != 0)
+  
+  #Change the case of text columns
+df_clean <- df_clean |>
+  mutate(dba = toupper(dba))|>
+  mutate(boro = tolower(boro))|>
+  mutate(cuisine_description = tolower(cuisine_description))
 
 df_clean
+
+  #Find out how many different violations each restaurant got####
+df_restaurant_indiv <- summarise(group_by(df_clean, dba), n()) #There are 11,615 valid restaurants in 2023
+
+df_merged <- df_clean |>
+  left_join(bob, by = "dba")
+
+df_merged|>
+  filter(`n()` < 10)|>
+  ggplot(aes(x = longitude, y = latitude, color = `n()` )) + geom_point()
+
