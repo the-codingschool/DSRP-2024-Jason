@@ -173,7 +173,7 @@ plot_byYear
     #04N: Flies
 df_cleanCol|>
   separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
-  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, violation_code == "04K", boro == "Manhattan")|>
+  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, violation_code == "04N", boro == "Manhattan")|>
   ggplot(aes(x = longitude, y = latitude, color = boro)) + geom_point()
 
 
@@ -186,7 +186,7 @@ df_cleanCol|>
 #Average number of violations per restaurant for each zipcode in a borough####
 df_cleanCol |>
   separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
-  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, violation_code == "04L")|>
+  filter(latitude != 0, longitude != 0, year_of_inspection == 2023, violation_code == "04L", boro == "Manhattan")|>
   group_by(zipcode) |>
   summarise(mean_score = mean(score, na.rm = TRUE))|>
   ggplot(aes(x = factor(zipcode), y = mean_score)) + geom_histogram(stat = "identity")
@@ -230,7 +230,7 @@ df_clean <- df_clean |>
 
 df_clean
 
-  #Find out how many different violations each restaurant got####
+#Find out how many different violations each restaurant got####
 df_restaurant_indiv <- summarise(group_by(df_clean, dba), n()) #There are 11,615 valid restaurants in 2023
 
 df_merged <- df_clean |>
@@ -240,3 +240,10 @@ df_merged|>
   filter(`n()` < 10)|>
   ggplot(aes(x = longitude, y = latitude, color = `n()` )) + geom_point()
 
+
+
+
+#Score vs. abundance####
+df_clean|>
+  filter(grade != "Z", grade != "P")|>
+  ggplot(aes(x = score, fill = grade)) + geom_bar()
