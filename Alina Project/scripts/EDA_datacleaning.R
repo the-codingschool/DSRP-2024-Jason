@@ -1,4 +1,6 @@
-
+library(titanic)
+library(dplyr)
+library(ggplot2)
 getwd()
 
 #read in dataset
@@ -15,6 +17,9 @@ library(janitor)
  #clean names of dataframe
 
 data_clean <- clean_names(data,case = 'snake')
+remove_empty(data_clean)
+na.omit(data_clean)
+
 
 #different inspections/scores/grades/boros
 unique(data_clean$score)
@@ -44,16 +49,20 @@ nrow(subset(data_clean, score <60)) - nrow(subset(data_clean, score <20))
 nrow(subset(data_clean, score <120)) - nrow(subset(data_clean, score <60))
 nrow(subset(data_clean, score <168)) - nrow(subset(data_clean, score <120))
 
+#separate data
+library(tidyr)
+data_sep <- separate(data_clean, col=inspection_date, into=c("day", "month", "year"), sep = "/")
+arrange(data_sep, year)
+
 #ggplot/histograms/box plots/ bar graphs/ pie charts/ scatterplots/ line graphs from data
   # distributions of scores overall 
+
 ggplot(data = data_clean, aes(score)) + geom_histogram(bins = 70)+
   labs(title = "distribution of scores of restaurants overall", x = "score",y = "count")
 
   # restaurants per borough overall
-library(tidyr)
-data_sep <- separate(data_clean, col=inspection_date, into=c("day", "month", "year"), sep = "/")
   
-ggplot(data_sep, aes(x = boro)) + geom_bar() + labs(title = "number or restaurants per borough in 2024", x = "boroughs",y = "count")
+ggplot(data_sep, aes(x = boro)) + geom_bar() + labs(title = "number or restaurants per borough", x = "boroughs",y = "count")
 
    
   # Distribution of the grades
