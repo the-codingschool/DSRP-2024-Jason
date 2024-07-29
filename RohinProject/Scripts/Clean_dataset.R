@@ -14,7 +14,7 @@ df_clean <- df|>
   separate(inspection_date, into = c("day", "month", "year_of_inspection"), sep = "/")|>
   filter(year_of_inspection == 2023)
 
-#remove unneccesary columns
+#remove the unneccesary columns
 df_clean <- df_clean |>
   select(!c("community_board", "council_district", "census_tract", "bin", "bbl", "nta", "location_point1", "phone", "grade_date"))
 
