@@ -204,7 +204,8 @@ df_cleanCol|>
 
 #CLEAN DATA####
   #remove rows that have grade and inspection date that are NA, and filter out years that are not 2023
-df_clean <- df_cleanCol|>
+df_clean <- df|>
+  clean_names(case = "snake")|>
   mutate(inspection_date = ifelse(inspection_date == "01/01/1900", NA, inspection_date))|>
   filter(!is.na(inspection_date))|>
   filter(!is.na(grade), grade != "N")|>

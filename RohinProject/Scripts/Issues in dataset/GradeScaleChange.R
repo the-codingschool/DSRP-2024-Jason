@@ -52,9 +52,12 @@ df_year_vs_violations|>
 plot_byYear <- df_cleanCol|>
   separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
   select(!c("day","month"))|>
+  filter(boro == 0)|>
   ggplot(aes(year_of_inspection, fill = factor(boro))) + geom_bar() + labs(title = "Year of Inspection vs. Count", x = "Year of Inspection", y = "Count")
 
 plot_byYear
+
+
 
 
 

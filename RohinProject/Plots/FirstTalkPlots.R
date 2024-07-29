@@ -36,10 +36,15 @@ df_VerminVisualization <- left_join(df_clean, df_vermin, by = "zipcode")
 #Plot the data
 df_VerminVisualization|>
   filter(boro == "manhattan")|>
-  ggplot(aes(x = longitude, y = latitude, color = n)) + geom_point() + labs(title = "Number of Restaurants in Manhattan with a Rat Violation per Zipcode", x = "Longitude", y = "Latitude")
+  ggplot(aes(x = longitude, y = latitude, color = n)) + geom_point() + labs(title = "Number of Restaurants in Manhattan with a Rat Violation by Zipcode", x = "Longitude", y = "Latitude")
 
 
 #Perceent of restaurants in different cuisines with a vermin violation in 2023####
+  #04K: rats
+  #04L: mice
+  #04M: roaches
+  #04N: Flies
+
 Code1 <- "04K"
 
 #Compute the count by cuisine
