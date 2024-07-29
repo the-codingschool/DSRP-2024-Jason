@@ -26,7 +26,7 @@ df_clean <- df_clean |>
   filter(boro != 0)
 
 #Change the case of text columns
-df_clean <- df_clean |>
+df_clean<- df_clean |>
   mutate(dba = toupper(dba))|>
   mutate(boro = tolower(boro))|>
   mutate(cuisine_description = tolower(cuisine_description))
