@@ -1,6 +1,6 @@
-##Create a KNN for predicting which pest violation the establishment has to be most concerned about####
+#KNN####
 df_pestViolations <- df_clean|>
-  filter(violation_code %in% c("04K","04L", "04M", "04N"), !is.na(latitude), !is.na(longitude), boro == "manhattan")
+  filter(violation_code %in% c("04K", "04L", "04M", "04N"), !is.na(latitude), !is.na(longitude), boro == "manhattan")
 
 #split the data
 split <- sample.split(df_pestViolations$violation_code, SplitRatio = 0.8)
@@ -10,10 +10,12 @@ test_data <- subset(df_pestViolations, split == FALSE)
 #train knn model based on latitude, longitude, zipcode, and cuisine description
 knn_model <- knn(train = train_data[, c('latitude', 'longitude', 'zipcode')],
                  test = test_data[, c('latitude', 'longitude', 'zipcode')],
-                 cl = train_data$violation_code, k = 9)
+                 cl = train_data$violation_code, k = 13)
+
+pred <- knn_model
 
 #create confusion matrix
-confusion_matrix <- table(test_data$violation_code, knn_model)
+confusion_matrix <- table(test_data$violation_code, pred)
 accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
 
 # Print the evaluation metrics
@@ -22,50 +24,36 @@ print(confusion_matrix)
 cat('\nAccuracy:', accuracy, '\n')
 
 
-##Encode every cuisine_description in a 6 digit binary string####
-#one hot encode cuisine description
+#one hot encode cuisine description####
 df_onehot <- df_pestViolations|>
-  filter(cuisine_description != "basque")
+  filter(cuisine_description %in% c("chinese/cuban", "african", "new american", "vegetarian", "tapas", "armenian", "egyptian", "english", "irish", "turkish", "barbecue", "eastern european", "continental", "indian", "creole/cajun", "salads", "australian", "soul food"))|>
+  mutate(cuisine_description1 = cuisine_description)|>
+  mutate(value = 1) |>
+  spread(key = cuisine_description1, value = value, fill = 0)
 
-# Create a mapping of unique cuisine descriptions to binary strings
-unique_cuisines <- unique(df_onehot$cuisine_description)
-binary_strings <- sapply(seq_along(unique_cuisines), function(x) paste0(as.integer(intToBits(x)[1:6]), collapse = ""))
+df_encoded1 <- left_join(df_pestViolations, df_onehot, by = "dba")|>
+  select(c("dba", "zipcode.x", "cuisine_description.x", "violation_code.x", "latitude.x", "longitude.x", "african", "armenian", "chinese/cuban", "new american", "vegetarian", "tapas", "egyptian", "english", "irish", "turkish", "barbecue", "eastern european", "continental", "indian", "creole/cajun", "salads", "australian", "soul food"))
 
-df_cuisine_to_binary <- data.frame(
-  cuisine_description = unique_cuisines,
-  cuisine_encoded = binary_strings
-)
+df_encoded <- df_encoded1|>
+  mutate_all(~ ifelse(is.na(.), 0, .))
 
-# Display the mapping
-print(cuisine_to_binary)
+df_encoded
 
-# Apply the mapping to your dataframe
-df_temp <- df_pestViolations |>
-  left_join(df_cuisine_to_binary, by = "cuisine_description")
-
-df_encoded <- df_temp |>
-  mutate(cuisine_encoded = if_else(is.na(cuisine_encoded), "00000", cuisine_encoded))
-
-df_encoded$cuisine_encoded <- as.character(df_encoded$cuisine_encoded)
-
-
-##KNN model including cuisine_description####
-
+#KNN with cuisine####
 #split the data
-split <- sample.split(df_encoded$violation_code, SplitRatio = 0.8)
+split <- sample.split(df_encoded$violation_code.x, SplitRatio = 0.8)
 train_data <- subset(df_encoded, split == TRUE)
 test_data <- subset(df_encoded, split == FALSE)
 
 #train knn model based on latitude, longitude, zipcode, and cuisine description
-knn_model <- knn(train = train_data[, c('latitude', 'longitude', 'zipcode', "cuisine_encoded")],
-                 test = test_data[, c('latitude', 'longitude', 'zipcode', "cuisine_encoded")],
-                 cl = train_data$violation_code, k = 15)
-
-pred <- knn_model
+knn_model <- knn(train = train_data[, c("latitude.x", "longitude.x", "african", "armenian", "chinese/cuban", "new american", "vegetarian", "tapas", "egyptian", "english", "irish", "turkish", "barbecue", "eastern european", "continental", "indian", "creole/cajun", "salads", "australian", "soul food")],
+                 test = test_data[, c("latitude.x", "longitude.x", "african", "armenian", "chinese/cuban", "new american", "vegetarian", "tapas", "egyptian", "english", "irish", "turkish", "barbecue", "eastern european", "continental", "indian", "creole/cajun", "salads", "australian", "soul food")],
+                 cl = train_data$violation_code.x, k = 13)
 
 #create confusion matrix
-confusion_matrix <- table(test_data$violation_code, pred)
+confusion_matrix <- table(test_data$violation_code.x, knn_model)
 accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+
 # Print the evaluation metrics
 cat('Confusion Matrix:\n')
 print(confusion_matrix)
