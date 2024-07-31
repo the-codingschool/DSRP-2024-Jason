@@ -70,6 +70,11 @@ cat('\nAccuracy:', accuracy, '\n')
 
 
 
+
+
+
+
+
 #Chi squared test for Conducive to Pests vs. every pest infestation####
 df_codeencoded <- df_clean|>
   filter(violation_code %in% c("04K", "04L", "04M", "04N", "08A"), boro == "manhattan")|>
@@ -97,6 +102,8 @@ df_codeencoded <- df_joined|>
   mutate(`04M` = ifelse(`04M` != 0 & `04M` != 1, 1, `04M`))|>
   mutate(`04N` = ifelse(`04N` != 0 & `04N` != 1, 1, `04N`))
 
+df_codeencoded
+
 chisq_rats <- table(df_codeencoded$`08A`, df_codeencoded$`04K`) 
 chisq_mice <- table(df_codeencoded$`08A`, df_codeencoded$`04L`) 
 chisq_roaches <- table(df_codeencoded$`08A`, df_codeencoded$`04M`) 
@@ -107,4 +114,47 @@ chisq.test(chisq_mice)
 chisq.test(chisq_roaches)
 chisq.test(chisq_flies)
 
-##Chi squared test for bad upkeep vs. every pest infestation
+##Chi squared test for bad upkeep vs. every pest infestation####
+df_codeencoded <- df_clean|>
+  filter(violation_code %in% c("04K", "04L", "04M", "04N", "10F"), boro == "manhattan")|>
+  mutate(value = 1) |>
+  spread(key = violation_code, value = value, fill = 0)|>
+  select(c("dba", "zipcode", "latitude", "longitude", "04K", "04L", "04M", "04N", "10F"))|>
+  distinct()|>
+  filter(longitude != 0, latitude != 0)|>
+  arrange(dba)
+
+df_codeencoded
+
+df_joined <- left_join(df_clean, df_codeencoded, by = "dba")|>
+  filter(boro == "manhattan")|>
+  mutate(`04K` = ifelse(is.na(`04K`), 0, `04K`))|>
+  mutate(`10F` = ifelse(is.na(`10F`), 0, `10F`))|>
+  mutate(`04L` = ifelse(is.na(`04L`), 0, `04L`))|>
+  mutate(`04M` = ifelse(is.na(`04M`), 0, `04M`))|>
+  mutate(`04N` = ifelse(is.na(`04N`), 0, `04N`))
+
+df_joined$`10F`
+
+df_codeencoded <- df_joined|>
+  group_by(dba) |>
+  summarise(across(starts_with("0"), ~sum(., na.rm = TRUE)))|>
+  mutate(`04K` = ifelse(`04K` != 0 & `04K` != 1, 1, `04K`))|>
+  mutate(`10F` = ifelse(`10F` != 0 & `10F` != 1, 1, `10F`))|>
+  mutate(`04L` = ifelse(`04L` != 0 & `04L` != 1, 1, `04L`))|>
+  mutate(`04M` = ifelse(`04M` != 0 & `04M` != 1, 1, `04M`))|>
+  mutate(`04N` = ifelse(`04N` != 0 & `04N` != 1, 1, `04N`))
+
+df_codeencoded
+
+chisq_rats <- table(df_codeencoded$`10F`, df_codeencoded$`04K`) 
+chisq_mice <- table(df_codeencoded$`10F`, df_codeencoded$`04L`) 
+chisq_roaches <- table(df_codeencoded$`10F`, df_codeencoded$`04M`) 
+chisq_flies <- table(df_codeencoded$`10F`, df_codeencoded$`04N`) 
+
+chisq.test(chisq_rats)
+chisq.test(chisq_mice)
+chisq.test(chisq_roaches)
+chisq.test(chisq_flies)
+
+
