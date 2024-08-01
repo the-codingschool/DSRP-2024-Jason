@@ -178,24 +178,27 @@ df_joined <- left_join(df_clean, df_codeencoded, by = "dba")|>
   mutate(`04M` = ifelse(is.na(`04M`), 0, `04M`))|>
   mutate(`04N` = ifelse(is.na(`04N`), 0, `04N`))
 
-df_joined
-
 df_codeencoded <- df_joined|>
   group_by(cuisine_description.x) |>
   summarise(across(starts_with("0"), ~sum(., na.rm = TRUE)))|>
-  mutate(`04K` = ifelse(`04K` != 0 & `04K` != 1, 1, `04K`))|>
-  mutate(`04L` = ifelse(`04L` != 0 & `04L` != 1, 1, `04L`))|>
-  mutate(`04M` = ifelse(`04M` != 0 & `04M` != 1, 1, `04M`))|>
-  mutate(`04N` = ifelse(`04N` != 0 & `04N` != 1, 1, `04N`))
+  rename(cuisine_description = cuisine_description.x)
 
-df_codeencoded
+df_codeencoded <- left_join(df_codeencoded, df_count_by_cuisine, by = "cuisine_description")
 
-chisq_rats <- table(df_codeencoded$cuisine_description.x, df_codeencoded$`04K`) 
-chisq_mice <- table(df_codeencoded$cuisine_description.x, df_codeencoded$`04L`) 
-chisq_roaches <- table(df_codeencoded$cuisine_description.x, df_codeencoded$`04M`) 
-chisq_flies <- table(df_codeencoded$cuisine_description.x, df_codeencoded$`04N`) 
+df_codeencoded <- df_codeencoded|>
+  mutate(ave_04K = `04K` / count_by_cuisine)|>
+  mutate(ave_04L = `04L` / count_by_cuisine)|>
+  mutate(ave_04M = `04M` / count_by_cuisine)|>
+  mutate(ave_04N = `04N` / count_by_cuisine)|>
+  select(!c("04K", "04L", "04M", "04N"))
+  
 
-fisher.test(chisq_rats)
-fisher.test(chisq_mice)
-fisher.test(chisq_roaches)
-fisher.test(chisq_flies)
+chisq_rats <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04K) 
+chisq_mice <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04L) 
+chisq_roaches <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04M) 
+chisq_flies <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04N) 
+
+chisq.test(chisq_rats)
+chisq.test(chisq_mice)
+chisq.test(chisq_roaches)
+chisq.test(chisq_flies)

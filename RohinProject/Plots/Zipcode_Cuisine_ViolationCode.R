@@ -5,7 +5,7 @@
 #04M: roaches
 #04N: Flies
 
-Code <- "04N"
+Code <- "04L"
 
 #Create a function to calculate the mode of a categorical column
 Mode <- function(x) {
@@ -30,7 +30,7 @@ df_merged <- df_merged |>
 df_merged <- left_join(df_clean, df_merged, by = "zipcode")
 
 #Summarise the data by most common cuisine in each zipcode
-df_zipcode_cuisine <- df_merged1|>
+df_zipcode_cuisine <- df_merged|>
   filter(boro == "manhattan",  violation_code == Code)|>
   group_by(zipcode)|>
   summarise(zipcode_cuisine = Mode(cuisine_description))
