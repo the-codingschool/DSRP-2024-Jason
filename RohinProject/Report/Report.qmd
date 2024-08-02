@@ -1,0 +1,23 @@
+The Correlation Between Cuisine, Zipcode, and Pest Violation Type in Manhattan Restaurants in 2023
+
+```{r setup}
+library(ggplot2)
+library(caTools)
+library(readr)
+library(downloader)
+library(caTools)
+library(FNN)
+library(readxl)
+library(dplyr)
+```
+
+```{r}
+#| echo: false
+2+2
+```
+
+```{r}
+#| message : false
+library(data.table)
+ 2+2
+```

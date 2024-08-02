@@ -56,9 +56,3 @@ plot_byYear <- df_cleanCol|>
   ggplot(aes(year_of_inspection, fill = factor(boro))) + geom_bar() + labs(title = "Year of Inspection vs. Count", x = "Year of Inspection", y = "Count")
 
 plot_byYear
-
-
-
-
-
-

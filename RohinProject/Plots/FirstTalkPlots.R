@@ -15,37 +15,13 @@ df_zipcodeScoreVisualization |>
 
 
 
-#Mean number of vermin violations in every Manhattan zipcode in 2023####
-
-#04K: rats
-#04L: mice
-#04M: roaches
-#04N: Flies
-
-Code = "04K"
-
-#Summarize the data based on zip code and number of 04_ violations
-df_vermin <- df_clean|>
-  filter(violation_code == Code)|>
-  group_by(zipcode)|>
-  summarise(n = n())
-
-#Join the Number of 04_ violations to the original data
-df_VerminVisualization <- left_join(df_clean, df_vermin, by = "zipcode")
-
-#Plot the data
-df_VerminVisualization|>
-  filter(boro == "manhattan")|>
-  ggplot(aes(x = longitude, y = latitude, color = n)) + geom_point() + labs(title = "Number of Restaurants in Manhattan with a Rat Violation by Zipcode", x = "Longitude", y = "Latitude")
-
-
 #Perceent of restaurants in different cuisines with a vermin violation in 2023####
   #04K: rats
   #04L: mice
   #04M: roaches
   #04N: Flies
 
-Code1 <- "04K"
+Code1 <- "04L"
 
 #Compute the count by cuisine
 df_count_by_cuisine <- df_clean |>
@@ -72,5 +48,13 @@ df_VerminByCuisine |>
   filter()|>
   ggplot(aes(x = cuisine_description, y = n, fill = cuisine_description)) + 
   geom_bar(stat = "identity") + 
-  labs(x = "Cuisine", y = "Instances of Rat Violations in 2023", title = "Percent of Restaurants with Rat Violations in 2023 by Cuisine") +
+  labs(x = "Cuisine", y = "Instances of Rat Violations in 2023", title = "Percent of Restaurants with Roach Violations in 2023 by Cuisine", color = "Cuisine") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+#Visualization with cuisine description in it####
+
+df_merged2 <- left_join(df_merged, df_zipcode_cuisine, by = "zipcode")
+
+df_merged2
