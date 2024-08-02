@@ -5,6 +5,7 @@ library(janitor)
 library(tidyr)
 library(tidyverse)
 
+
 getwd()
 
 #read in dataset
@@ -190,3 +191,5 @@ getwd()
   #distribution of inspection scores 
     #per year
   ggplot(data = data_sep, aes(x = score, fill = year)) + geom_histogram(bins = 100) + labs(title = "distribution of scores per year", x = "Scores", y = "Count", fill = "Years")
+
+
