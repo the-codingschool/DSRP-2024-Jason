@@ -1,3 +1,32 @@
+#Install and load in Packages####
+if (!requireNamespace("ggplot2", quietly = TRUE)) {
+  install.packages("ggplot2")
+}
+if (!requireNamespace("caTools", quietly = TRUE)) {
+  install.packages("caTools")
+}
+if (!requireNamespace("readr", quietly = TRUE)) {
+  install.packages("readr")
+}
+if (!requireNamespace("downloader", quietly = TRUE)) {
+  install.packages("downloader")
+}
+if (!requireNamespace("caTools", quietly = TRUE)) {
+  install.packages("caTools")
+}
+if (!requireNamespace("FNN", quietly = TRUE)) {
+  install.packages("FNN")
+}
+if (!requireNamespace("readxl", quietly = TRUE)) {
+  install.packages("readxl")
+}
+if (!requireNamespace("dplyr", quietly = TRUE)) {
+  install.packages("dplyr")
+}
+if (!requireNamespace("nnet", quietly = TRUE)) {
+  install.packages("nnet")
+}
+
 library(ggplot2)
 library(caTools)
 library(readr)
@@ -6,10 +35,9 @@ library(caTools)
 library(FNN)
 library(readxl)
 library(dplyr)
-if (!requireNamespace("coin", quietly = TRUE)) {
-  install.packages("coin")
-}
-library(coin)
+library(nnet)
+
+#CORRELATION BETWEEN ZIPCODE, LATITUDE, LONGITUDE AND PEST VIOLATION TYPE
 
 #KNN, location vs violation code####
 df_pestViolations <- df_clean|>
@@ -35,8 +63,6 @@ accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
 cat('Confusion Matrix:\n')
 print(confusion_matrix)
 cat('\nAccuracy:', accuracy, '\n')
-
-
 
 #one hot encode cuisine description####
 df_onehot <- df_pestViolations|>
@@ -78,6 +104,8 @@ cat('\nAccuracy:', accuracy, '\n')
 
 
 
+
+#CORRELATION BETWEEN RESTAURANT CONDITION AND PEST VIOLATION TYPE
 #Chi squared test for Conducive to Pests vs. every pest infestation####
 df_codeencoded <- df_clean|>
   filter(violation_code %in% c("04K", "04L", "04M", "04N", "08A"), boro == "manhattan")|>
@@ -163,51 +191,14 @@ chisq.test(chisq_flies)
 
 
 
-##Chi squared tests violation code vs. cuisine####
-df_codeencoded <- df_clean|>
-  filter(violation_code %in% c("04K", "04L", "04M", "04N"), boro == "manhattan")|>
-  mutate(value = 1) |>
-  spread(key = violation_code, value = value, fill = 0)|>
-  select(c("dba", "zipcode", "latitude", "longitude", "cuisine_description","04K", "04L", "04M", "04N"))|>
-  distinct()|>
-  filter(longitude != 0, latitude != 0)|>
-  arrange(dba)
 
-df_joined <- left_join(df_clean, df_codeencoded, by = "dba")|>
-  filter(boro == "manhattan")|>
-  mutate(`04K` = ifelse(is.na(`04K`), 0, `04K`))|>
-  mutate(`04L` = ifelse(is.na(`04L`), 0, `04L`))|>
-  mutate(`04M` = ifelse(is.na(`04M`), 0, `04M`))|>
-  mutate(`04N` = ifelse(is.na(`04N`), 0, `04N`))
+#CORRELATION BETWEEN CUISINE, ZIPCODE, PEST VIOLATION TYPE
+#Cuisine Description from Zipcode - Chi Squared Test####
+chisq_cuisine_zipcode <- table(df_anova$zipcode, df_anova$cuisine_description) 
+chisq.test(chisq_cuisine_zipcode)
+fisher.test(chisq_cuisine_zipcode,simulate.p.value=TRUE)
 
-df_joined
-
-df_codeencoded <- df_joined|>
-  group_by(cuisine_description.x) |>
-  summarise(across(starts_with("0"), ~sum(., na.rm = TRUE)))|>
-  rename(cuisine_description = cuisine_description.x)
-
-df_codeencoded <- left_join(df_codeencoded, df_count_by_cuisine, by = "cuisine_description")
-
-df_codeencoded <- df_codeencoded|>
-  mutate(ave_04K = `04K` / count_by_cuisine)|>
-  mutate(ave_04L = `04L` / count_by_cuisine)|>
-  mutate(ave_04M = `04M` / count_by_cuisine)|>
-  mutate(ave_04N = `04N` / count_by_cuisine)|>
-  select(!c("04K", "04L", "04M", "04N"))
-  
-chisq_rats <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04K) 
-chisq_mice <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04L) 
-chisq_roaches <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04M) 
-chisq_flies <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04N) 
-
-fisher.test(chisq_rats, simulate.p.value=TRUE)
-fisher.test(chisq_mice, simulate.p.value=TRUE)
-fisher.test(chisq_roaches, simulate.p.value=TRUE)
-fisher.test(chisq_flies, simulate.p.value=TRUE)
-
-
-#Anova test for average number of pest violations ~ cuisine and zipcode####
+#Violation Codes from Cuisine and Zipcode - Anova Test####
 #prepare a frame to add zipcode to existing
 df_zipcodeanova <- df_clean|>
   filter(boro == "manhattan", violation_code %in% c("04k", "04L", "04N", "04M"), !is.na(zipcode))|>
@@ -227,3 +218,15 @@ anova_04M <- aov(ave_04M ~ cuisine_description + factor(zipcode), data = df_anov
 summary(anova_04M)
 anova_04N <- aov(ave_04N ~ cuisine_description + factor(zipcode), data = df_anova)
 summary(anova_04N)
+
+
+#Cuisine Description from Violation Codes - Multinom regression####
+# Prepaare cuisine column for multinomial logistical regression
+df_anova$cuisine_description <- as.factor(df_anova$cuisine_description)
+
+# Fit the multinomial logistic regression model
+multinom_model <- multinom(cuisine_description ~ ave_04K + ave_04L + ave_04M + ave_04N, data = df_anova)
+
+# Calculate p-values
+z_values <- summary(multinom_model)$coefficients / summary(multinom_model)$standard.errors
+2 * (1 - pnorm(abs(z_values)))
