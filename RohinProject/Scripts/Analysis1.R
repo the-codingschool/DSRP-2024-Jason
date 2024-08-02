@@ -6,6 +6,10 @@ library(caTools)
 library(FNN)
 library(readxl)
 library(dplyr)
+if (!requireNamespace("coin", quietly = TRUE)) {
+  install.packages("coin")
+}
+library(coin)
 
 #KNN, location vs violation code####
 df_pestViolations <- df_clean|>
@@ -169,14 +173,14 @@ df_codeencoded <- df_clean|>
   filter(longitude != 0, latitude != 0)|>
   arrange(dba)
 
-df_codeencoded
-
 df_joined <- left_join(df_clean, df_codeencoded, by = "dba")|>
   filter(boro == "manhattan")|>
   mutate(`04K` = ifelse(is.na(`04K`), 0, `04K`))|>
   mutate(`04L` = ifelse(is.na(`04L`), 0, `04L`))|>
   mutate(`04M` = ifelse(is.na(`04M`), 0, `04M`))|>
   mutate(`04N` = ifelse(is.na(`04N`), 0, `04N`))
+
+df_joined
 
 df_codeencoded <- df_joined|>
   group_by(cuisine_description.x) |>
@@ -192,13 +196,34 @@ df_codeencoded <- df_codeencoded|>
   mutate(ave_04N = `04N` / count_by_cuisine)|>
   select(!c("04K", "04L", "04M", "04N"))
   
-
 chisq_rats <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04K) 
 chisq_mice <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04L) 
 chisq_roaches <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04M) 
 chisq_flies <- table(df_codeencoded$cuisine_description, df_codeencoded$ave_04N) 
 
-chisq.test(chisq_rats)
-chisq.test(chisq_mice)
-chisq.test(chisq_roaches)
-chisq.test(chisq_flies)
+fisher.test(chisq_rats, simulate.p.value=TRUE)
+fisher.test(chisq_mice, simulate.p.value=TRUE)
+fisher.test(chisq_roaches, simulate.p.value=TRUE)
+fisher.test(chisq_flies, simulate.p.value=TRUE)
+
+
+#Anova test for average number of pest violations ~ cuisine and zipcode####
+#prepare a frame to add zipcode to existing
+df_zipcodeanova <- df_clean|>
+  filter(boro == "manhattan", violation_code %in% c("04k", "04L", "04N", "04M"), !is.na(zipcode))|>
+  select(c("dba", "cuisine_description", "zipcode", "latitude", "longitude"))
+
+#add a zipcode column to the existing dataset
+df_anova <- left_join(df_zipcodeanova, df_codeencoded, by = "cuisine_description")
+
+df_anova
+
+#perform anova tests
+anova_04K <- aov(ave_04K ~ cuisine_description + factor(zipcode), data = df_anova)
+summary(anova_04K)
+anova_04L <- aov(ave_04L ~ cuisine_description + factor(zipcode), data = df_anova)
+summary(anova_04L)
+anova_04M <- aov(ave_04M ~ cuisine_description + factor(zipcode), data = df_anova)
+summary(anova_04M)
+anova_04N <- aov(ave_04N ~ cuisine_description + factor(zipcode), data = df_anova)
+summary(anova_04N)
