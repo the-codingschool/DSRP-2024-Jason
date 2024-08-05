@@ -37,7 +37,42 @@ library(readxl)
 library(dplyr)
 library(nnet)
 
+#Data preprocessing####
+df_codeencoded <- df_clean|>
+  filter(violation_code %in% c("04K", "04L", "04M", "04N"), boro == "manhattan")|>
+  mutate(value = 1) |>
+  spread(key = violation_code, value = value, fill = 0)|>
+  select(c("dba", "zipcode", "latitude", "longitude", "cuisine_description","04K", "04L", "04M", "04N"))|>
+  distinct()|>
+  filter(longitude != 0, latitude != 0)|>
+  arrange(dba)
+df_codeencoded
+df_joined <- left_join(df_clean, df_codeencoded, by = "dba")|>
+  filter(boro == "manhattan")|>
+  mutate(`04K` = ifelse(is.na(`04K`), 0, `04K`))|>
+  mutate(`04L` = ifelse(is.na(`04L`), 0, `04L`))|>
+  mutate(`04M` = ifelse(is.na(`04M`), 0, `04M`))|>
+  mutate(`04N` = ifelse(is.na(`04N`), 0, `04N`))
+
+df_codeencoded <- df_joined|>
+  group_by(cuisine_description.x) |>
+  summarise(across(starts_with("0"), ~sum(., na.rm = TRUE)))|>
+  rename(cuisine_description = cuisine_description.x)
+
+df_codeencoded <- left_join(df_codeencoded, df_count_by_cuisine, by = "cuisine_description")
+
+df_codeencoded <- df_codeencoded|>
+  mutate(ave_04K = `04K` / count_by_cuisine)|>
+  mutate(ave_04L = `04L` / count_by_cuisine)|>
+  mutate(ave_04M = `04M` / count_by_cuisine)|>
+  mutate(ave_04N = `04N` / count_by_cuisine)|>
+  select(!c("04K", "04L", "04M", "04N"))
+
 #CORRELATION BETWEEN CUISINE, ZIPCODE, PEST VIOLATION TYPE
+
+
+
+
 #Cuisine Description from Zipcode - Chi Squared Test####
 chisq_cuisine_zipcode <- table(df_anova$zipcode, df_anova$cuisine_description) 
 chisq.test(chisq_cuisine_zipcode)
@@ -46,7 +81,7 @@ fisher.test(chisq_cuisine_zipcode,simulate.p.value=TRUE)
 #Violation Codes from Cuisine and Zipcode - Anova Test####
 #prepare a frame to add zipcode to existing
 df_zipcodeanova <- df_clean|>
-  filter(boro == "manhattan", violation_code %in% c("04k", "04L", "04N", "04M"), !is.na(zipcode))|>
+  filter(boro == "manhattan", violation_code %in% c("04K", "04L", "04N", "04M"), !is.na(zipcode))|>
   select(c("dba", "cuisine_description", "zipcode", "latitude", "longitude"))
 
 #add a zipcode column to the existing dataset
@@ -63,6 +98,56 @@ anova_04M <- aov(ave_04M ~ cuisine_description + factor(zipcode), data = df_anov
 summary(anova_04M)
 anova_04N <- aov(ave_04N ~ cuisine_description + factor(zipcode), data = df_anova)
 summary(anova_04N)
+
+
+
+
+
+
+#Plot P Values for zipcode
+sum_test1 = unlist(summary(anova_04K))
+sum_test2 = unlist(summary(anova_04L))
+sum_test3 = unlist(summary(anova_04M))
+sum_test4 = unlist(summary(anova_04N))
+
+p_04K <- sum_test1["Pr(>F)2"]
+p_04L <- sum_test2["Pr(>F)2"]
+p_04M <- sum_test3["Pr(>F)2"]
+p_04N <- sum_test4["Pr(>F)2"]
+
+violation_codes <- c("04K", "04L", "04M", "04N")
+p_values <- c(p_04K, p_04L, p_04M, p_04N)
+
+anova_graph <- data.frame(Violation_Codes = violation_codes, P_Values = p_values)
+
+ggplot(anova_graph, aes(x = violation_codes, y = p_values, fill = violation_codes)) + 
+  geom_bar(stat = "identity") + 
+  labs(x = "Violation Codes", y = "P-Values", title = "Violation Codes Vs. Zipcode P-Values")+
+  geom_hline(yintercept = 0.05, color = "black")+
+  ylim(0, 1)
+
+#Plot P Values for Cuisine Description
+sum_test1 = unlist(summary(anova_04K))
+sum_test2 = unlist(summary(anova_04L))
+sum_test3 = unlist(summary(anova_04M))
+sum_test4 = unlist(summary(anova_04N))
+
+p_04K <- sum_test1["Pr(>F)1"]
+p_04L <- sum_test2["Pr(>F)1"]
+p_04M <- sum_test3["Pr(>F)1"]
+p_04N <- sum_test4["Pr(>F)1"]
+
+violation_codes <- c("04K", "04L", "04M", "04N")
+p_values <- c(p_04K, p_04L, p_04M, p_04N)
+
+anova_graph <- data.frame(Violation_Codes = violation_codes, P_Values = p_values)
+
+ggplot(anova_graph, aes(x = violation_codes, y = p_values, fill = violation_codes)) + 
+  geom_bar(stat = "identity") + 
+  labs(x = "Violation Codes", y = "P-Values", title = "Violation Codes Vs. Zipcode P-Values")+
+  geom_hline(yintercept = 0.05, color = "black")+
+  ylim(0, 1)
+
 
 
 #Cuisine Description from Violation Codes - Multinom regression####
