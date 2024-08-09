@@ -46,7 +46,7 @@ df_codeencoded <- df_clean|>
   distinct()|>
   filter(longitude != 0, latitude != 0)|>
   arrange(dba)
-df_codeencoded
+
 df_joined <- left_join(df_clean, df_codeencoded, by = "dba")|>
   filter(boro == "manhattan")|>
   mutate(`04K` = ifelse(is.na(`04K`), 0, `04K`))|>
@@ -75,8 +75,29 @@ df_codeencoded <- df_codeencoded|>
 
 #Cuisine Description from Zipcode - Chi Squared Test####
 chisq_cuisine_zipcode <- table(df_anova$zipcode, df_anova$cuisine_description) 
-chisq.test(chisq_cuisine_zipcode)
-fisher.test(chisq_cuisine_zipcode,simulate.p.value=TRUE)
+chisq_cuisinezipcode <- chisq.test(chisq_cuisine_zipcode)
+fisher_cuisinezipcode <- fisher.test(chisq_cuisine_zipcode,simulate.p.value=TRUE)
+
+sum_chisqtest1 = unlist(summary(chisq_cuisinezipcode))
+p_chisq <- sum_chisqtest1["Pr(>F)"]
+
+sum_fishertest1 = unlist(summary(fisher_cuisinezipcode))
+p_fisher <- sum_fishertest1["Pr(>F)"]
+
+p_chisq
+p_fisher
+
+Test_Type <- c("Fisher Test", "Chi-Squared Test")
+P_values <- c(0.0004998, 0)
+
+df_chisq_graph <- data.frame(Test_Type = Test_Type,  P_values = P_values)
+
+ggplot(df_chisq_graph, aes(x = Test_Type, y = P_values, fill = Test_Type)) + 
+  geom_bar(stat = "identity")+
+  geom_hline(yintercept = 0.05, color = "black")+
+  ylim(0,1)+
+  labs(x = "Test Type", y = "P-Values", title = "Cuisine Description Vs. Zipcode P-values")
+
 
 #Violation Codes from Cuisine and Zipcode - Anova Test####
 #prepare a frame to add zipcode to existing
@@ -98,7 +119,6 @@ anova_04M <- aov(ave_04M ~ cuisine_description + factor(zipcode), data = df_anov
 summary(anova_04M)
 anova_04N <- aov(ave_04N ~ cuisine_description + factor(zipcode), data = df_anova)
 summary(anova_04N)
-
 
 
 
@@ -144,9 +164,54 @@ anova_graph <- data.frame(Violation_Codes = violation_codes, P_Values = p_values
 
 ggplot(anova_graph, aes(x = violation_codes, y = p_values, fill = violation_codes)) + 
   geom_bar(stat = "identity") + 
-  labs(x = "Violation Codes", y = "P-Values", title = "Violation Codes Vs. Zipcode P-Values")+
+  labs(x = "Violation Codes", y = "P-Values", title = "Violation Codes Vs. Cuisine Description P-Values", fill = "Violation Codes")+
   geom_hline(yintercept = 0.05, color = "black")+
   ylim(0, 1)
+
+
+#ANOVA Test Zipcode Vs. Cuisine description####
+df_codeencoded <- df_clean|>
+  filter(violation_code %in% c("04K", "04L", "04M", "04N"), boro == "manhattan")|>
+  mutate(value = 1) |>
+  spread(key = violation_code, value = value, fill = 0)|>
+  select(c("dba", "zipcode", "latitude", "longitude", "cuisine_description","04K", "04L", "04M", "04N"))|>
+  distinct()|>
+  filter(longitude != 0, latitude != 0)|>
+  arrange(dba)
+
+df_count_by_zipcode <- df_clean|>
+  filter(!is.na(zipcode))|>
+  group_by(zipcode)|>
+  distinct(dba)|>
+  summarise(number = n())
+
+df_codeencoded <- left_join(df_codeencoded, df_count_by_zipcode, by = "zipcode")
+
+df_codeencoded <- df_codeencoded|>
+  mutate(ave_04K = `04K` / number)|>
+  mutate(ave_04L = `04L` / number)|>
+  mutate(ave_04M = `04M` / number)|>
+  mutate(ave_04N = `04N` / number)|>
+  select(!c("04K", "04L", "04M", "04N"))
+
+df_combined <- df_codeencoded |>
+  group_by(dba, zipcode, latitude, longitude, cuisine_description, number) |>
+  summarise(
+    `04K` = sum(ave_04K, na.rm = TRUE),
+    `04L` = sum(ave_04L, na.rm = TRUE),
+    `04M` = sum(ave_04M, na.rm = TRUE),
+    `04N` = sum(ave_04N, na.rm = TRUE)
+  ) |>
+  ungroup()
+
+anova_04K <- aov(`04K` ~ factor(zipcode), data = df_combined)
+summary(anova_04K)
+anova_04L <- aov(`04L` ~  factor(zipcode), data = df_combined)
+summary(anova_04L)
+anova_04M <- aov(`04M` ~  factor(zipcode), data = df_combined)
+summary(anova_04M)
+anova_04N <- aov(`04N` ~  factor(zipcode), data = df_combined)
+summary(anova_04N)
 
 
 
@@ -159,4 +224,4 @@ multinom_model <- multinom(cuisine_description ~ ave_04K + ave_04L + ave_04M + a
 
 # Calculate p-values
 z_values <- summary(multinom_model)$coefficients / summary(multinom_model)$standard.errors
-2 * (1 - pnorm(abs(z_values)))
+p_values <- 2 * (1 - pnorm(abs(z_values)))
