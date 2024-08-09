@@ -5,7 +5,7 @@
 #04M: roaches
 #04N: Flies
 
-Code <- "04M"
+Code <- "04K"
 
 #Create a function to calculate the mode of a categorical column
 Mode <- function(x) {
@@ -42,7 +42,7 @@ b <- df_merged |>
   filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
   ggplot(aes(x = longitude, y = latitude, color = zipcode_cuisine)) +
   geom_point() +
-  labs(title = "  Percent of Restaurants in Manhattan with Rat Infestation by Zipcode", x = "Longitude", y = "Latitude", color = "% Restaurants with Rat Infestation") +
+  labs(title = "  Cuisine with most Percent of Rat Violations by Zipcode in 2023", x = "Longitude", y = "Latitude", color = "Cuisine Description") +
   theme_classic() + 
   theme(
     axis.title.x = element_blank(),
