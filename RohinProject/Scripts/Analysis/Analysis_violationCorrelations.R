@@ -68,10 +68,12 @@ cat('\nAccuracy:', accuracy, '\n')
 
 #CORRELATION BETWEEN RESTAURANT CONDITION AND PEST VIOLATION TYPE
 #Chi squared test for Conducive to Pests vs. every pest infestation####
-possible_codes = c("02A","02B","02C","02F","02G","02H","02I","03B","03C","03F","03I","04A","04C",
+possible_codes = c("04C",
                    "04E","04H","04J","04K","04L","04M","04N","04O","05C","05D","05F","05H","06A",
                    "06B","06C","06D","06E","06F","08A","08B","08C","09A","09B","09C","09E","10A",
                    "10B","10C","10D","10E","10F","10G","10H")
+
+#"02A","02B","02C","02F","02G","02H","02I","03B","03C","03F","03I","04A",
 
 for (violation_code in possible_codes) {
 cat("\nResults for Violation Code:", violation_code, "\n")
