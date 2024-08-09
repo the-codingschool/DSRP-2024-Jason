@@ -44,15 +44,17 @@ df_year_vs_violations <- summarise(group_by(df_byYear, year_of_inspection), mean
 
 #create scatter plot
 df_year_vs_violations|>
-  ggplot(aes(year_of_inspection, `mean(score)`)) + geom_point() + labs(x = "Year of Inspection", y = "Mean Score per Inspection", title = "Mean Score per Inspection")
+  ggplot(aes(year_of_inspection, `mean(score)`, fill = year_of_inspection)) + 
+  geom_bar(stat = "identity") + 
+  labs(x = "Year of Inspection", y = "Mean Score per Citation", title = "Mean Score per Citation", fill = "Year of Inspection")
 
 
 
 #Bar Chart showing the amount of inspections logged over the years####
-plot_byYear <- df_cleanCol|>
+df_cleanCol|>
   separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
   select(!c("day","month"))|>
-  filter(boro == 0)|>
-  ggplot(aes(year_of_inspection, fill = factor(boro))) + geom_bar() + labs(title = "Year of Inspection vs. Count", x = "Year of Inspection", y = "Count")
-
-plot_byYear
+  filter(boro != 0, year_of_inspection != 1900)|>
+  ggplot(aes(year_of_inspection, fill = year_of_inspection)) + 
+  geom_bar() + 
+  labs(title = "Year of Inspection vs. Number of Inspections", x = "Year of Inspection", y = "Number of Inspections", fill = "Year of Inspection")

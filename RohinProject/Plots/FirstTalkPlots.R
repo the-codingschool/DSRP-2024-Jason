@@ -21,7 +21,7 @@ df_zipcodeScoreVisualization |>
   #04M: roaches
   #04N: Flies
 
-Code1 <- "04L"
+Code1 <- "04K"
 
 #Compute the count by cuisine
 df_count_by_cuisine <- df_clean |>
@@ -48,7 +48,7 @@ df_VerminByCuisine |>
   filter()|>
   ggplot(aes(x = cuisine_description, y = n, fill = cuisine_description)) + 
   geom_bar(stat = "identity") + 
-  labs(x = "Cuisine", y = "Instances of Rat Violations in 2023", title = "Percent of Restaurants with Roach Violations in 2023 by Cuisine", color = "Cuisine") +
+  labs(x = "Cuisine", y = "Instances of Rat Violations in 2023", title = "Percent of Restaurants with Rat Violations in 2023 by Cuisine", color = "Cuisine") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
