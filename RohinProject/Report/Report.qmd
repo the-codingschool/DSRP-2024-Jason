@@ -1,6 +1,21 @@
-The Correlation Between Cuisine, Zipcode, and Pest Violation Type in Manhattan Restaurants in 2023
+# A Data-Informed Guide to Identifying Pest Violations in Manhattan
 
-```{r setup}
+## Abstract
+
+Manhattan is a borough of New York City, the most populous city in North America, with 1.7 million people living there and an additional 2.3 million people commuting for work. With a population density of 17,000 people per mi² during weekdays, public health is paramount. This study aims to identify key factors contributing to pest infestations in Manhattan's restaurants, focusing on correlations between specific violations and restaurant characteristics to form a data-informed guide. It is built using data from a 2023 subset of the Department of Health and Mental Hygiene (DOHMH) New York City Annual Restaurant Inspection Results dataset and methods including statistical tests and machine learning models such as K-Nearest Neighbor Models, Chi-Squared Tests, Fisher's Tests, ANOVA Tests, and Multinomial Logistic Regression. This study suggests that certain types of restaurants and areas are more prone to pest issues by identifying correlations between Cuisine, Zipcode, and Pest Violation Codes (Rats, Mice, Roaches, and Flies), and Other Violation Codes (Garbage not properly disposed of, Handwashing station not set up). This guide can help restaurant inspectors perform targeted inspections and restaurateurs to apply preventive measures, helping to mitigate pest-related health risks in Manhattan's densely populated areas.
+
+## Background
+
+The dataset in this study that was used to identify the key factors that are correlated to pest infestations in Manhattan’s restaurants is created by the DOHMH to log annual New York City restaurant citations. This dataset contains data from 2015 up till the present day and is being updated daily. However, this dataset is not perfect; there are several inconsistencies in the dataset over the years which have resulted in using only 2023 for the purposes of this study:
+
+1\) The mean score per citation has been increasing over the years; the grading scale is getting tougher on the restaurants.
+
+2\) The number of inspections have been increasing dramatically between 2015 and 2024.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
 library(ggplot2)
 library(caTools)
 library(readr)
@@ -8,16 +23,1143 @@ library(downloader)
 library(caTools)
 library(FNN)
 library(readxl)
+library(janitor)
+library(readr)
 library(dplyr)
+library(ggplot2)
+library(tidyverse)
+
+#Read In dataset
+df <- read_csv("/Users/rohinv/Downloads/DSRP-2024-Jason/data/DOHMH_New_York_City_Restaurant_Inspection_Results_20240721.csv.zip")
+
+df_clean <- df|>
+  clean_names(case = "snake")|>
+  mutate(inspection_date = ifelse(inspection_date == "01/01/1900", NA, inspection_date))|>
+  filter(!is.na(inspection_date))|>
+  filter(!is.na(grade), grade != "N")|>
+  separate(inspection_date, into = c("day", "month", "year_of_inspection"), sep = "/")|>
+  filter(year_of_inspection == 2023)
+
+#remove the unneccesary columns
+df_clean <- df_clean |>
+  select(!c("community_board", "council_district", "census_tract", "bin", "bbl", "nta", "location_point1", "phone", "grade_date"))
+
+#Convert NA placeholder values to NA
+df_clean <- df_clean |>
+  mutate(longitude = ifelse(longitude == 0, NA, longitude))|>
+  mutate(latitude = ifelse(latitude == 0, NA, latitude))|>
+  mutate(action = ifelse(action == "No violations were recorded at the time of this inspection.", NA, action))|>
+  filter(boro != 0)
+
+#Change the case of text columns
+df_clean<- df_clean |>
+  mutate(dba = toupper(dba))|>
+  mutate(boro = tolower(boro))|>
+  mutate(cuisine_description = tolower(cuisine_description))
+```
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+```{r}
+#| echo: false
+#| warning: false
+#fix case discrepencies in column name
+df_cleanCol <- df |>
+  clean_names(case = "snake")
+
+df_byYear <- df_cleanCol|>
+  separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
+  filter(year_of_inspection != 1900, !is.na(score), score != "NA")|>
+  arrange(year_of_inspection)
+  
+
+#create a table with columns year_of_inspection and mean number of violations per restaurant
+df_year_vs_violations <- summarise(group_by(df_byYear, year_of_inspection), mean(score))
+
+df_year_vs_violations|>
+  ggplot(aes(year_of_inspection, `mean(score)`, fill = year_of_inspection)) + 
+  geom_bar(stat = "identity") + 
+  labs(x = "Year of Inspection", y = "Mean Score per Citation", title = "Mean Score per Citation", fill = "Year of Inspection")
+```
+
+***Figure 1a**: The Mean Score Per Inspection is increasing over the years indicating a change in grading scale.*
+
+:::
+
+::: {.column width=“50%”}
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+df_cleanCol|>
+  separate(inspection_date, into=c("day", "month", "year_of_inspection"), sep = "/")|>
+  select(!c("day","month"))|>
+  filter(boro != 0, year_of_inspection != 1900)|>
+  ggplot(aes(year_of_inspection, fill = year_of_inspection)) + 
+  geom_bar() + 
+  labs(title = "Year of Inspection vs. Number of Inspections", x = "Year of Inspection", y = "Number of Inspections", fill = "Year of Inspection")
+```
+
+***Figure 1b:** The Number of Inspections is increasing over the years indicating a change in inspection policy.*
+
+:::
+
+:::
+
+##  Results
+
+### Geography vs. Cuisine vs. Pest Violation Type
+
+#### Graphs
+
+Figures 2a-d display a map of Manhattan with a spectrum denoting the abundance of specified pests by zipcode. These results might shed light into where different populations of rats, mice, roaches, and flies reside and/or give us information on the condition of restaurants in that zipcode.
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+```{r}
+#| echo: false
+#| warning: false
+#04K: rats
+#04L: mice
+#04M: roaches
+#04N: Flies
+
+Code <- "04K"
+
+#Create a function to calculate the mode of a categorical column
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+#create two dataframes with number of restaurants and number of infested restaurants by zipcode
+df_total_restaurants <- df_clean |>
+  group_by(zipcode) |>
+  summarise(total_restaurants = n())
+
+df_vermin <- df_clean |>
+  filter(violation_code == Code) |>
+  group_by(zipcode) |>
+  summarise(vermin_restaurants = n())
+
+#use the total number of restaurants in the zipcode and the vermin infested restarurants and find the percent of restaurants in the zipcode infested
+df_merged <- left_join(df_vermin, df_total_restaurants, by = "zipcode")
+df_merged <- df_merged |>
+  mutate(percent_vermin = (vermin_restaurants / total_restaurants) * 100)
+df_merged <- left_join(df_clean, df_merged, by = "zipcode")
+
+#Summarise the data by most common cuisine in each zipcode
+df_zipcode_cuisine <- df_merged|>
+  filter(boro == "manhattan",  violation_code == Code)|>
+  group_by(zipcode)|>
+  summarise(zipcode_cuisine = Mode(cuisine_description))
+
+df_merged <- left_join(df_merged, df_zipcode_cuisine, by = "zipcode")
+
+#Plot the data; most common restaurant with violation by zipcode
+b <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = zipcode_cuisine)) +
+  geom_point() +
+  labs(title = "  Cuisine with most Percent of Rat Violations by Zipcode in 2023", x = "Longitude", y = "Latitude", color = "Cuisine Description") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+#Plot the data; percent restaurants that have pest violations in the zipcode
+a <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = percent_vermin)) +
+  geom_point() +
+  #gghighlight(zipcode_cuisine == "coffee/tea") +
+  scale_color_gradient(low = "lightblue", high = "black") +
+  labs(title = "  Percent of Restaurants in Manhattan with Rat Infestation by Zipcode", x = "Longitude", y = "Latitude", color = "% Restaurants with Rat Infestation") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+a
+```
+
+***Figure 2a**: Rat Violations are more common in the Harlem area and Downtown.*
+
+:::
+
+::: {.column width="50%"}
+
+```{r}
+#| echo: false
+#| warning: false
+#04K: rats
+#04L: mice
+#04M: roaches
+#04N: Flies
+
+Code <- "04L"
+
+#Create a function to calculate the mode of a categorical column
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+#create two dataframes with number of restaurants and number of infested restaurants by zipcode
+df_total_restaurants <- df_clean |>
+  group_by(zipcode) |>
+  summarise(total_restaurants = n())
+
+df_vermin <- df_clean |>
+  filter(violation_code == Code) |>
+  group_by(zipcode) |>
+  summarise(vermin_restaurants = n())
+
+#use the total number of restaurants in the zipcode and the vermin infested restarurants and find the percent of restaurants in the zipcode infested
+df_merged <- left_join(df_vermin, df_total_restaurants, by = "zipcode")
+df_merged <- df_merged |>
+  mutate(percent_vermin = (vermin_restaurants / total_restaurants) * 100)
+df_merged <- left_join(df_clean, df_merged, by = "zipcode")
+
+#Summarise the data by most common cuisine in each zipcode
+df_zipcode_cuisine <- df_merged|>
+  filter(boro == "manhattan",  violation_code == Code)|>
+  group_by(zipcode)|>
+  summarise(zipcode_cuisine = Mode(cuisine_description))
+
+df_merged <- left_join(df_merged, df_zipcode_cuisine, by = "zipcode")
+
+#Plot the data; most common restaurant with violation by zipcode
+b <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = zipcode_cuisine)) +
+  geom_point() +
+  labs(title = "  Cuisine with most Percent of Mouse Violations by Zipcode in 2023", x = "Longitude", y = "Latitude", color = "Cuisine Description") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+#Plot the data; percent restaurants that have pest violations in the zipcode
+a <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = percent_vermin)) +
+  geom_point() +
+  #gghighlight(zipcode_cuisine == "coffee/tea") +
+  scale_color_gradient(low = "lightblue", high = "black") +
+  labs(title = "  Percent of Restaurants in Manhattan with Mouse Infestation by Zipcode", x = "Longitude", y = "Latitude", color = "% Restaurants with Rat Infestation") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+a
+```
+
+***Figure 2b:** Mouse Violations are more ubiquitous than the other pests.*
+
+:::
+
+:::
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+```{r}
+#| echo: false
+#| warning: false
+#04K: rats
+#04L: mice
+#04M: roaches
+#04N: Flies
+
+Code <- "04M"
+
+#Create a function to calculate the mode of a categorical column
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+#create two dataframes with number of restaurants and number of infested restaurants by zipcode
+df_total_restaurants <- df_clean |>
+  group_by(zipcode) |>
+  summarise(total_restaurants = n())
+
+df_vermin <- df_clean |>
+  filter(violation_code == Code) |>
+  group_by(zipcode) |>
+  summarise(vermin_restaurants = n())
+
+#use the total number of restaurants in the zipcode and the vermin infested restarurants and find the percent of restaurants in the zipcode infested
+df_merged <- left_join(df_vermin, df_total_restaurants, by = "zipcode")
+df_merged <- df_merged |>
+  mutate(percent_vermin = (vermin_restaurants / total_restaurants) * 100)
+df_merged <- left_join(df_clean, df_merged, by = "zipcode")
+
+#Summarise the data by most common cuisine in each zipcode
+df_zipcode_cuisine <- df_merged|>
+  filter(boro == "manhattan",  violation_code == Code)|>
+  group_by(zipcode)|>
+  summarise(zipcode_cuisine = Mode(cuisine_description))
+
+df_merged <- left_join(df_merged, df_zipcode_cuisine, by = "zipcode")
+
+#Plot the data; most common restaurant with violation by zipcode
+b <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = zipcode_cuisine)) +
+  geom_point() +
+  labs(title = "  Cuisine with most Percent of Roach Violations by Zipcode in 2023", x = "Longitude", y = "Latitude", color = "Cuisine Description") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+#Plot the data; percent restaurants that have pest violations in the zipcode
+a <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = percent_vermin)) +
+  geom_point() +
+  #gghighlight(zipcode_cuisine == "coffee/tea") +
+  scale_color_gradient(low = "lightblue", high = "black") +
+  labs(title = "  Percent of Restaurants in Manhattan with Roach Infestation by Zipcode", x = "Longitude", y = "Latitude", color = "% Restaurants with Rat Infestation") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+a
+```
+
+**Figure 2c**: *Roach Infestations are more common in the Harlem area of Manhattan.*
+
+:::
+
+::: {.column width="50%"}
+
+```{r}
+#| echo: false
+#| warning: false
+
+#04K: rats
+#04L: mice
+#04M: roaches
+#04N: Flies
+
+Code <- "04N"
+
+#Create a function to calculate the mode of a categorical column
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+#create two dataframes with number of restaurants and number of infested restaurants by zipcode
+df_total_restaurants <- df_clean |>
+  group_by(zipcode) |>
+  summarise(total_restaurants = n())
+
+df_vermin <- df_clean |>
+  filter(violation_code == Code) |>
+  group_by(zipcode) |>
+  summarise(vermin_restaurants = n())
+
+#use the total number of restaurants in the zipcode and the vermin infested restarurants and find the percent of restaurants in the zipcode infested
+df_merged <- left_join(df_vermin, df_total_restaurants, by = "zipcode")
+df_merged <- df_merged |>
+  mutate(percent_vermin = (vermin_restaurants / total_restaurants) * 100)
+df_merged <- left_join(df_clean, df_merged, by = "zipcode")
+
+#Summarise the data by most common cuisine in each zipcode
+df_zipcode_cuisine <- df_merged|>
+  filter(boro == "manhattan",  violation_code == Code)|>
+  group_by(zipcode)|>
+  summarise(zipcode_cuisine = Mode(cuisine_description))
+
+df_merged <- left_join(df_merged, df_zipcode_cuisine, by = "zipcode")
+
+#Plot the data; most common restaurant with violation by zipcode
+b <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = zipcode_cuisine)) +
+  geom_point() +
+  labs(title = "  Cuisine with most Percent of Fly Violations by Zipcode in 2023", x = "Longitude", y = "Latitude", color = "Cuisine Description") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+#Plot the data; percent restaurants that have pest violations in the zipcode
+a <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = percent_vermin)) +
+  geom_point() +
+  #gghighlight(zipcode_cuisine == "coffee/tea") +
+  scale_color_gradient(low = "lightblue", high = "black") +
+  labs(title = "  Percent of Restaurants in Manhattan with Fly Infestation by Zipcode", x = "Longitude", y = "Latitude", color = "% Restaurants with Rat Infestation") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+a
+```
+
+***Figure 2d**: Fly Infestations are also more common in the Harlem Area.*
+
+:::
+
+:::
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+```{r}
+#| echo: false
+#| warning: false
+#04K: rats
+#04L: mice
+#04M: roaches
+#04N: Flies
+
+Code <- "04K"
+
+#Create a function to calculate the mode of a categorical column
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+#create two dataframes with number of restaurants and number of infested restaurants by zipcode
+df_total_restaurants <- df_clean |>
+  group_by(zipcode) |>
+  summarise(total_restaurants = n())
+
+df_vermin <- df_clean |>
+  filter(violation_code == Code) |>
+  group_by(zipcode) |>
+  summarise(vermin_restaurants = n())
+
+#use the total number of restaurants in the zipcode and the vermin infested restarurants and find the percent of restaurants in the zipcode infested
+df_merged <- left_join(df_vermin, df_total_restaurants, by = "zipcode")
+df_merged <- df_merged |>
+  mutate(percent_vermin = (vermin_restaurants / total_restaurants) * 100)
+df_merged <- left_join(df_clean, df_merged, by = "zipcode")
+
+#Summarise the data by most common cuisine in each zipcode
+df_zipcode_cuisine <- df_merged|>
+  filter(boro == "manhattan",  violation_code == Code)|>
+  group_by(zipcode)|>
+  summarise(zipcode_cuisine = Mode(cuisine_description))
+
+df_merged <- left_join(df_merged, df_zipcode_cuisine, by = "zipcode")
+
+#Plot the data; most common restaurant with violation by zipcode
+b <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = zipcode_cuisine)) +
+  geom_point() +
+  labs(title = "  Cuisine with the Most Percent of Rat Infestations by Zipcode in 2023", x = "Longitude", y = "Latitude", color = "Cuisine Description") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+#Plot the data; percent restaurants that have pest violations in the zipcode
+a <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = percent_vermin)) +
+  geom_point() +
+  #gghighlight(zipcode_cuisine == "coffee/tea") +
+  scale_color_gradient(low = "lightblue", high = "black") +
+  labs(title = "  Percent of Restaurants in Manhattan with Rat Infestation by Zipcode", x = "Longitude", y = "Latitude", color = "% Restaurants with Rat Infestation") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+b
+```
+
+***Figure 3a**: Restaurant cuisines with the most percentage of Rat violations by zipcode are more varied.*
+
+:::
+
+::: {.column width="50%"}
+
+```{r}
+#| echo: false
+#| warning: false
+#04K: rats
+#04L: mice
+#04M: roaches
+#04N: Flies
+
+Code <- "04L"
+
+#Create a function to calculate the mode of a categorical column
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+#create two dataframes with number of restaurants and number of infested restaurants by zipcode
+df_total_restaurants <- df_clean |>
+  group_by(zipcode) |>
+  summarise(total_restaurants = n())
+
+df_vermin <- df_clean |>
+  filter(violation_code == Code) |>
+  group_by(zipcode) |>
+  summarise(vermin_restaurants = n())
+
+#use the total number of restaurants in the zipcode and the vermin infested restarurants and find the percent of restaurants in the zipcode infested
+df_merged <- left_join(df_vermin, df_total_restaurants, by = "zipcode")
+df_merged <- df_merged |>
+  mutate(percent_vermin = (vermin_restaurants / total_restaurants) * 100)
+df_merged <- left_join(df_clean, df_merged, by = "zipcode")
+
+#Summarise the data by most common cuisine in each zipcode
+df_zipcode_cuisine <- df_merged|>
+  filter(boro == "manhattan",  violation_code == Code)|>
+  group_by(zipcode)|>
+  summarise(zipcode_cuisine = Mode(cuisine_description))
+
+df_merged <- left_join(df_merged, df_zipcode_cuisine, by = "zipcode")
+
+#Plot the data; most common restaurant with violation by zipcode
+b <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = zipcode_cuisine)) +
+  geom_point() +
+  labs(title = "  Cuisine with the Most Percent of Mouse Infestations by Zipcode in 2023", x = "Longitude", y = "Latitude", color = "Cuisine Description") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+#Plot the data; percent restaurants that have pest violations in the zipcode
+a <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = percent_vermin)) +
+  geom_point() +
+  #gghighlight(zipcode_cuisine == "coffee/tea") +
+  scale_color_gradient(low = "lightblue", high = "black") +
+  labs(title = "  Percent of Restaurants in Manhattan with Mouse Infestation by Zipcode", x = "Longitude", y = "Latitude", color = "% Restaurants with Rat Infestation") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+b
+```
+
+***Figure 3b:** American cuisine is the cuisine with the most percent of Mouse Violations in Downtown New York.*
+
+:::
+
+:::
+
+Figures 3a-d show which cuisines have the most percentage of restaurants with the specified pest violation by zipcode. These results might give some insight into which cuisines' ingredients the pests find most attractive and/or which cuisines' restaurant establishments are most out of shape.
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+```{r}
+#| echo: false
+#| warning: false
+#04K: rats
+#04L: mice
+#04M: roaches
+#04N: Flies
+
+Code <- "04M"
+
+#Create a function to calculate the mode of a categorical column
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+#create two dataframes with number of restaurants and number of infested restaurants by zipcode
+df_total_restaurants <- df_clean |>
+  group_by(zipcode) |>
+  summarise(total_restaurants = n())
+
+df_vermin <- df_clean |>
+  filter(violation_code == Code) |>
+  group_by(zipcode) |>
+  summarise(vermin_restaurants = n())
+
+#use the total number of restaurants in the zipcode and the vermin infested restarurants and find the percent of restaurants in the zipcode infested
+df_merged <- left_join(df_vermin, df_total_restaurants, by = "zipcode")
+df_merged <- df_merged |>
+  mutate(percent_vermin = (vermin_restaurants / total_restaurants) * 100)
+df_merged <- left_join(df_clean, df_merged, by = "zipcode")
+
+#Summarise the data by most common cuisine in each zipcode
+df_zipcode_cuisine <- df_merged|>
+  filter(boro == "manhattan",  violation_code == Code)|>
+  group_by(zipcode)|>
+  summarise(zipcode_cuisine = Mode(cuisine_description))
+
+df_merged <- left_join(df_merged, df_zipcode_cuisine, by = "zipcode")
+
+#Plot the data; most common restaurant with violation by zipcode
+b <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = zipcode_cuisine)) +
+  geom_point() +
+  labs(title = "  Cuisine with the Most Percent of Roach Violations by Zipcode in 2023", x = "Longitude", y = "Latitude", color = "Cuisine Description") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+#Plot the data; percent restaurants that have pest violations in the zipcode
+a <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = percent_vermin)) +
+  geom_point() +
+  #gghighlight(zipcode_cuisine == "coffee/tea") +
+  scale_color_gradient(low = "lightblue", high = "black") +
+  labs(title = "  Percent of Restaurants in Manhattan with Roach Infestation by Zipcode", x = "Longitude", y = "Latitude", color = "% Restaurants with Rat Infestation") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+b
+```
+
+**Figure 3c**: *Restaurant cuisines with the most percentage of Roach violations by zipcode are also very varied.*
+
+:::
+
+::: {.column width="50%"}
+
+```{r}
+#| echo: false
+#| warning: false
+
+#04K: rats
+#04L: mice
+#04M: roaches
+#04N: Flies
+
+Code <- "04N"
+
+#Create a function to calculate the mode of a categorical column
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
+#create two dataframes with number of restaurants and number of infested restaurants by zipcode
+df_total_restaurants <- df_clean |>
+  group_by(zipcode) |>
+  summarise(total_restaurants = n())
+
+df_vermin <- df_clean |>
+  filter(violation_code == Code) |>
+  group_by(zipcode) |>
+  summarise(vermin_restaurants = n())
+
+#use the total number of restaurants in the zipcode and the vermin infested restarurants and find the percent of restaurants in the zipcode infested
+df_merged <- left_join(df_vermin, df_total_restaurants, by = "zipcode")
+df_merged <- df_merged |>
+  mutate(percent_vermin = (vermin_restaurants / total_restaurants) * 100)
+df_merged <- left_join(df_clean, df_merged, by = "zipcode")
+
+#Summarise the data by most common cuisine in each zipcode
+df_zipcode_cuisine <- df_merged|>
+  filter(boro == "manhattan",  violation_code == Code)|>
+  group_by(zipcode)|>
+  summarise(zipcode_cuisine = Mode(cuisine_description))
+
+df_merged <- left_join(df_merged, df_zipcode_cuisine, by = "zipcode")
+
+#Plot the data; most common restaurant with violation by zipcode
+b <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = zipcode_cuisine)) +
+  geom_point() +
+  labs(title = "  Cuisine with the Most Percent of Fly Violations by Zipcode in 2023", x = "Longitude", y = "Latitude", color = "Cuisine Description") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+#Plot the data; percent restaurants that have pest violations in the zipcode
+a <- df_merged |>
+  filter(boro == "manhattan", vermin_restaurants != 0, percent_vermin < 20) |>
+  ggplot(aes(x = longitude, y = latitude, color = percent_vermin)) +
+  geom_point() +
+  #gghighlight(zipcode_cuisine == "coffee/tea") +
+  scale_color_gradient(low = "lightblue", high = "black") +
+  labs(title = "  Percent of Restaurants in Manhattan with Fly Infestation by Zipcode", x = "Longitude", y = "Latitude", color = "% Restaurants with Rat Infestation") +
+  theme_classic() + 
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    panel.grid = element_blank()
+  )
+
+b
+```
+
+***Figure 3d**: American cuisine is also the cuisine with the most percent of Fly Violations in Downtown New York.*
+
+:::
+
+:::
+
+Figures 4a-d show the percent of restaurants that have a specified pest infestation by cuisine. This information can help restaurant inspectors prepare for inspections.
+
+```{r}
+#| echo: false
+Code1 <- "04K"
+
+#Compute the count by cuisine
+df_count_by_cuisine <- df_clean |>
+  group_by(cuisine_description) |>
+  summarise(count_by_cuisine = n())
+
+#Filter the data for Manhattan and the specific violation code
+df_filtered <- df_clean |> 
+  filter(boro == "manhattan", cuisine_description != "not listed/not applicable", violation_code == Code1)
+
+#Join the filtered data with the count_by_cuisine
+df_joined <- left_join(df_filtered, df_count_by_cuisine, by = "cuisine_description")
+
+#Summarise to calculate the ratio
+df_VerminByCuisine <- df_joined |> 
+  group_by(cuisine_description) |> 
+  summarise(n = n() / first(count_by_cuisine))
+
+df_VerminByCuisine <- df_VerminByCuisine |> 
+  mutate(cuisine_description = fct_reorder(cuisine_description, n))
+
+#Filter and plot the data
+df_VerminByCuisine |>
+  filter()|>
+  ggplot(aes(x = cuisine_description, y = n)) + 
+  geom_bar(stat = "identity") + 
+  labs(x = "Cuisine", y = "Instances of Rat Violations in 2023", title = "Percent of Restaurants with Rat Violations in 2023 by Cuisine", color = "Cuisine") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+***Figure 4a**: Chinese/Cuban cuisine is most likely to have a Rat Violation because 4% of Chinese/Cuban cuisine has a Rat Violation.*
+
+```{r}
+#| echo: false
+Code1 <- "04L"
+
+#Compute the count by cuisine
+df_count_by_cuisine <- df_clean |>
+  group_by(cuisine_description) |>
+  summarise(count_by_cuisine = n())
+
+#Filter the data for Manhattan and the specific violation code
+df_filtered <- df_clean |> 
+  filter(boro == "manhattan", cuisine_description != "not listed/not applicable", violation_code == Code1)
+
+#Join the filtered data with the count_by_cuisine
+df_joined <- left_join(df_filtered, df_count_by_cuisine, by = "cuisine_description")
+
+#Summarise to calculate the ratio
+df_VerminByCuisine <- df_joined |> 
+  group_by(cuisine_description) |> 
+  summarise(n = n() / first(count_by_cuisine))
+
+df_VerminByCuisine <- df_VerminByCuisine |> 
+  mutate(cuisine_description = fct_reorder(cuisine_description, n))
+
+#Filter and plot the data
+df_VerminByCuisine |>
+  filter()|>
+  ggplot(aes(x = cuisine_description, y = n)) + 
+  geom_bar(stat = "identity") + 
+  labs(x = "Cuisine", y = "Instances of Mouse Violations in 2023", title = "Percent of Restaurants with Mouse Violations in 2023 by Cuisine", color = "Cuisine") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+***Figure 4b***: *Armenian cuisine is most likely to have a Rat Violation because 10% of Armenian cuisine has a Mouse Violation.*
+
+```{r}
+#| echo: false
+Code1 <- "04M"
+
+#Compute the count by cuisine
+df_count_by_cuisine <- df_clean |>
+  group_by(cuisine_description) |>
+  summarise(count_by_cuisine = n())
+
+#Filter the data for Manhattan and the specific violation code
+df_filtered <- df_clean |> 
+  filter(boro == "manhattan", cuisine_description != "not listed/not applicable", violation_code == Code1)
+
+#Join the filtered data with the count_by_cuisine
+df_joined <- left_join(df_filtered, df_count_by_cuisine, by = "cuisine_description")
+
+#Summarise to calculate the ratio
+df_VerminByCuisine <- df_joined |> 
+  group_by(cuisine_description) |> 
+  summarise(n = n() / first(count_by_cuisine))
+
+df_VerminByCuisine <- df_VerminByCuisine |> 
+  mutate(cuisine_description = fct_reorder(cuisine_description, n))
+
+#Filter and plot the data
+df_VerminByCuisine |>
+  filter()|>
+  ggplot(aes(x = cuisine_description, y = n)) + 
+  geom_bar(stat = "identity") + 
+  labs(x = "Cuisine", y = "Instances of Roach Violations in 2023", title = "Percent of Restaurants with Roach Violations in 2023 by Cuisine", color = "Cuisine") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+***Figure 4c:*** *Turkish Cuisine is most likely to have a Rat Violation because \~25% of Turkish cuisine has a Roach Violation.*
+
+```{r}
+#| echo: false
+Code1 <- "04N"
+
+#Compute the count by cuisine
+df_count_by_cuisine <- df_clean |>
+  group_by(cuisine_description) |>
+  summarise(count_by_cuisine = n())
+
+#Filter the data for Manhattan and the specific violation code
+df_filtered <- df_clean |> 
+  filter(boro == "manhattan", cuisine_description != "not listed/not applicable", violation_code == Code1)
+
+#Join the filtered data with the count_by_cuisine
+df_joined <- left_join(df_filtered, df_count_by_cuisine, by = "cuisine_description")
+
+#Summarise to calculate the ratio
+df_VerminByCuisine <- df_joined |> 
+  group_by(cuisine_description) |> 
+  summarise(n = n() / first(count_by_cuisine))
+
+df_VerminByCuisine <- df_VerminByCuisine |> 
+  mutate(cuisine_description = fct_reorder(cuisine_description, n))
+
+#Filter and plot the data
+df_VerminByCuisine |>
+  filter()|>
+  ggplot(aes(x = cuisine_description, y = n)) + 
+  geom_bar(stat = "identity") + 
+  labs(x = "Cuisine", y = "Instances of Fly Violations in 2023", title = "Percent of Restaurants with Fly Violations in 2023 by Cuisine", color = "Cuisine") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Figure 4d: *Creole/Cajun cuisine is most likely to have a Rat Violation because \~17% of Creole/Cajun cuisine has a Fly Violation.*
+
+#### Statistical Tests
+
+![](images/Screenshot 2024-08-15 at 7.32.33 AM.png){fig-align="center"}
+
+**Cuisine from Pest Violation Type**
+
+Multinomial Logistic Regression was used to find the correlations between Pest Violation Type and Cuisine. This model is used to model outcomes where the dependent variable is categorical and has more than many levels. I found that there are certain Pest Violation Types and Cuisines that are correlated with each other, but not all of them are correlated.
+
+| Cuisine                  | Violation Type | P-Values     |
+|--------------------------|----------------|--------------|
+| Asian/Asian Fusion       | Fly            | 0.016        |
+| Australian               | Fly            | 0.018        |
+| Bakery Products/Desserts | Mouse          | 0.045        |
+| Barbecue                 | Mouse          | 0.035        |
+| Coffee/Tea               | Mouse          | 1.026e-05    |
+| Chicken                  | Mouse          | 0.015        |
+| Creole/Cajun             | Fly            | 0.019        |
+| French                   | Roach          | 0.004        |
+| Fusion                   | Fly            | 0.003        |
+| Hamburgers               | Fly            | 0.010        |
+| Indian                   | Roach          | 0.026        |
+| Latin American           | Mouse & Fly    | 0.011, 0.029 |
+| Middle Eastern           | Mouse          | 0.022        |
+| Peruvian                 | Mouse          | 0.031        |
+| Salads                   | Mouse          | 1.021e-14    |
+| Sandwiches               | Mouse          | 0.006        |
+| Soul Food                | Mouse          | 0.046        |
+| Soups/Salads/Sandwiches  | Mouse          | 0.034        |
+| Steakhouse               | Fly            | 0.00         |
+| Thai                     | Rat            | 2.597e-12    |
+
+***Figure 5a:** The specified restaurant is **more likely** to have the specified pest violation than any other.*
+
+**Cuisine vs. Zipcode**
+
+A Chi-Squared Test as well as a Fisher's Test was used to test the correlation between Cuisine and Zipcode. These tests were used because they compare two categorical variables, and Cuisine and Zipcode fall under that description. I found that there is indeed a correlation between Cuisine and Zipcode. This means that Figures 3a-d are backed by statistical significance.
+
+```{r}
+#| echo: false
+Test_Type <- c("Fisher Test", "Chi-Squared Test")
+P_values <- c(0.0004998, 0)
+
+df_chisq_graph <- data.frame(Test_Type = Test_Type,  P_values = P_values)
+
+ggplot(df_chisq_graph, aes(x = Test_Type, y = P_values, fill = Test_Type)) + 
+  geom_bar(stat = "identity")+
+  geom_hline(yintercept = 0.05, color = "black")+
+  ylim(0,1)+
+  labs(x = "Test Type", y = "P-Values", title = "Cuisine Description Vs. Zipcode P-values")
+```
+
+***Figure 5b**: P-values are under α = 0.05, therefore Zipcode and Cuisine have a statistically significant correlation.*
+
+**Pest Violation Type vs. Zipcode and Cuisine**
+
+An Anova Test was used to test the correlation between Zipcode & Cuisine and Pest Violation Code. It was used because Anova tests are used to test the correlation between a categorical numerical variable as well as a categorical variable. Pest Violation Type was transformed into a numerical categorical variable by calculating the average number of each Pest Violation Type grouped by Cuisine and Zipcode for each Anova test. I found that there is a correlation between both Cuisine and Pest Violation Type & Zipcode and Pest Violation Type. This also means that Figures 2a-d and Figures 4a-d are backed by statistical significance.
+
+```{r}
+#| echo: false
+#| message: false
+#| include: false
+df_codeencoded <- df_clean|>
+  filter(violation_code %in% c("04K", "04L", "04M", "04N"), boro == "manhattan")|>
+  mutate(value = 1) |>
+  spread(key = violation_code, value = value, fill = 0)|>
+  select(c("dba", "zipcode", "latitude", "longitude", "cuisine_description","04K", "04L", "04M", "04N"))|>
+  distinct()|>
+  filter(longitude != 0, latitude != 0)|>
+  arrange(dba)
+
+df_joined <- left_join(df_clean, df_codeencoded, by = "dba")|>
+  filter(boro == "manhattan")|>
+  mutate(`04K` = ifelse(is.na(`04K`), 0, `04K`))|>
+  mutate(`04L` = ifelse(is.na(`04L`), 0, `04L`))|>
+  mutate(`04M` = ifelse(is.na(`04M`), 0, `04M`))|>
+  mutate(`04N` = ifelse(is.na(`04N`), 0, `04N`))
+
+df_codeencoded <- df_joined|>
+  group_by(cuisine_description.x) |>
+  summarise(across(starts_with("0"), ~sum(., na.rm = TRUE)))|>
+  rename(cuisine_description = cuisine_description.x)
+
+df_codeencoded <- left_join(df_codeencoded, df_count_by_cuisine, by = "cuisine_description")
+
+df_codeencoded <- df_codeencoded|>
+  mutate(ave_04K = `04K` / count_by_cuisine)|>
+  mutate(ave_04L = `04L` / count_by_cuisine)|>
+  mutate(ave_04M = `04M` / count_by_cuisine)|>
+  mutate(ave_04N = `04N` / count_by_cuisine)|>
+  select(!c("04K", "04L", "04M", "04N"))
+
+df_zipcodeanova <- df_clean|>
+  filter(boro == "manhattan", violation_code %in% c("04K", "04L", "04N", "04M"), !is.na(zipcode))|>
+  select(c("dba", "cuisine_description", "zipcode", "latitude", "longitude"))
+
+#add a zipcode column to the existing dataset
+df_anova <- left_join(df_zipcodeanova, df_codeencoded, by = "cuisine_description")
+
+#perform anova tests
+anova_04K <- aov(ave_04K ~ cuisine_description + factor(zipcode), data = df_anova)
+summary(anova_04K)
+anova_04L <- aov(ave_04L ~ cuisine_description + factor(zipcode), data = df_anova)
+summary(anova_04L)
+anova_04M <- aov(ave_04M ~ cuisine_description + factor(zipcode), data = df_anova)
+summary(anova_04M)
+anova_04N <- aov(ave_04N ~ cuisine_description + factor(zipcode), data = df_anova)
+summary(anova_04N)
 ```
 
 ```{r}
 #| echo: false
-2+2
+#Plot P Values for Cuisine Description
+sum_test1 = unlist(summary(anova_04K))
+sum_test2 = unlist(summary(anova_04L))
+sum_test3 = unlist(summary(anova_04M))
+sum_test4 = unlist(summary(anova_04N))
+
+p_04K <- sum_test1["Pr(>F)1"]
+p_04L <- sum_test2["Pr(>F)1"]
+p_04M <- sum_test3["Pr(>F)1"]
+p_04N <- sum_test4["Pr(>F)1"]
+
+violation_codes <- c("04K", "04L", "04M", "04N")
+p_values <- c(p_04K, p_04L, p_04M, p_04N)
+
+anova_graph <- data.frame(Violation_Codes = violation_codes, P_Values = p_values)
+
+ggplot(anova_graph, aes(x = violation_codes, y = p_values, fill = violation_codes)) + 
+  geom_bar(stat = "identity") + 
+  labs(x = "Violation Codes", y = "P-Values", title = "Pest Violation Type Vs. Cuisine Description P-Values", fill = "Violation Codes")+
+  geom_hline(yintercept = 0.05, color = "black")+
+  ylim(0, 1)
 ```
 
+***Figure 5c**: The correlation between Violation Code and Zipcode is Statistically Significant*
+
 ```{r}
-#| message : false
-library(data.table)
- 2+2
+#| echo: false
+#Plot P Values for Cuisine Description
+sum_test1 = unlist(summary(anova_04K))
+sum_test2 = unlist(summary(anova_04L))
+sum_test3 = unlist(summary(anova_04M))
+sum_test4 = unlist(summary(anova_04N))
+
+p_04K <- sum_test1["Pr(>F)1"]
+p_04L <- sum_test2["Pr(>F)1"]
+p_04M <- sum_test3["Pr(>F)1"]
+p_04N <- sum_test4["Pr(>F)1"]
+
+violation_codes <- c("04K", "04L", "04M", "04N")
+p_values <- c(p_04K, p_04L, p_04M, p_04N)
+
+anova_graph <- data.frame(Violation_Codes = violation_codes, P_Values = p_values)
+
+ggplot(anova_graph, aes(x = violation_codes, y = p_values, fill = violation_codes)) + 
+  geom_bar(stat = "identity") + 
+  labs(x = "Violation Codes", y = "P-Values", title = "Pest Violation Type Vs. Zipcode P-Values", fill = "Violation Codes")+
+  geom_hline(yintercept = 0.05, color = "black")+
+  ylim(0, 1)
 ```
+
+***Figure 5d**: The correlation between Pest Violation Type and Zipcode is Statistically Significant*
+
+### Pest Violation Type vs. Other Violation Type
+
+The table below shows which Other Violation Types that a restaurant has that makes it more likely to harbor Rats, Mice, Roaches, or Flies.
+
+| Violation                                                                           | Pest Violations            | P-Values                                       |
+|-----------------|------------------------------|--------------------------|
+|  Food not protected from cross-contamination                                        | Rats, Roaches, Flies       | 0.005091, 0.008444, 6.159e-05                  |
+| Culinary sink or alternative method not provided for washing food                   | Rats                       | 0.0007472                                      |
+| Hand washing facilities not provided or not located where required                  | Rats, Roaches, Flies       | 0.01913, 0.0007209, 0.02828                    |
+| Food not properly protected when stored                                             | Roaches                    | 0.003129                                       |
+| Equipment with food contact surfaces not clean and sanitized                        | Mice                       | 0.003348                                       |
+| Prevention and control measures not used for pest management                        | Rats, Mice, Roaches, Flies | \< 2.2e-16, \< 2.2e-16, \< 2.2e-16, \< 2.2e-16 |
+| Garbage not properly removed or stored                                              | Mice, Flies                | 0.0198, 3.376e-13                              |
+| Pesticides not properly labeled, not authorized for use, or improperly used         | Rats, Mice, Roaches, Flies | 2.137e-10, 9.836e-14, 2.202e-11, 7.726e-05     |
+| Toilet facility not properly maintained                                             | Rats                       | 0.00242                                        |
+| Improper disposal of sewage or liquid waste                                         | Mice, Flies                | 0.03035, 0.006392                              |
+| Thermometers not provided in cold/hot storage                                       | Roaches, Flies             | 0.006546, 0.003033                             |
+| Non-food contact surfaces (wall, ceiling, floors) improperly constructed/maintained | Mice, Flies                | 8.566e-07, 9.552e-05                           |
+
+## Discussion
+
+These results can prove useful in restaurant inspection as a guide to health inspectors. Firstly, they can look up the zipcode and cuisine on the guide and see which violations similar restaurants are likely to have and prepare for their visit. Secondly, during the inspection, health inspectors can look up which pest violation a restaurant is likely to have from easily discernible characteristics from the kitchen like whether or not a proper waste disposal system is in place.
+
+Some future work that would be very useful in making health inspection and restaurant upkeep easier would be to investigate whether or not there is any causation between environmental factors in New York Streets and pest abundances in that zipcode. It would also be useful to do the same analysis with the 2024 dataset for an up-to-date guide.
+
+## **Code and Data Availability**
+
+The data is from the DOHMH's NYC OpenData website: <https://data.cityofnewyork.us/Health/DOHMH-New-York-City-Restaurant-Inspection-Results/43nn-pn8j/about_data>
+
+The code is available on Github in DSRP-2024-Jason Repository under RohinProject: <https://github.com/the-codingschool/DSRP-2024-Jason>
+
+## **Acknowledgements**
+
+I would like to acknowledge Jason Moon, my mentor, for providing excellent guidance and direction
+
+I would like to acknowledge Sarah Parker for teaching us data science, statistics, and coding in R
+
+I would like to acknowledge Shruti, my TA, for helping with technical issues while coding
+
+I would like to acknowledge The Coding School for the wonderful opportunity to learn Data Science
