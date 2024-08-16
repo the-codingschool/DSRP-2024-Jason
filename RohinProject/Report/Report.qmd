@@ -58,10 +58,8 @@ df_clean<- df_clean |>
   mutate(cuisine_description = tolower(cuisine_description))
 ```
 
-::: {.columns}
-
+::: columns
 ::: {.column width="50%"}
-
 ```{r}
 #| echo: false
 #| warning: false
@@ -85,11 +83,9 @@ df_year_vs_violations|>
 ```
 
 ***Figure 1a**: The Mean Score Per Inspection is increasing over the years indicating a change in grading scale.*
-
 :::
 
-::: {.column width=“50%”}
-
+::: {.column width="“50%”"}
 ```{r}
 #| echo: false
 #| message: false
@@ -104,12 +100,10 @@ df_cleanCol|>
 ```
 
 ***Figure 1b:** The Number of Inspections is increasing over the years indicating a change in inspection policy.*
-
+:::
 :::
 
-:::
-
-##  Results
+## Results
 
 ### Geography vs. Cuisine vs. Pest Violation Type
 
@@ -117,10 +111,8 @@ df_cleanCol|>
 
 Figures 2a-d display a map of Manhattan with a spectrum denoting the abundance of specified pests by zipcode. These results might shed light into where different populations of rats, mice, roaches, and flies reside and/or give us information on the condition of restaurants in that zipcode.
 
-::: {.columns}
-
+::: columns
 ::: {.column width="50%"}
-
 ```{r}
 #| echo: false
 #| warning: false
@@ -201,11 +193,9 @@ a
 ```
 
 ***Figure 2a**: Rat Violations are more common in the Harlem area and Downtown.*
-
 :::
 
 ::: {.column width="50%"}
-
 ```{r}
 #| echo: false
 #| warning: false
@@ -286,15 +276,11 @@ a
 ```
 
 ***Figure 2b:** Mouse Violations are more ubiquitous than the other pests.*
-
+:::
 :::
 
-:::
-
-::: {.columns}
-
+::: columns
 ::: {.column width="50%"}
-
 ```{r}
 #| echo: false
 #| warning: false
@@ -375,11 +361,9 @@ a
 ```
 
 **Figure 2c**: *Roach Infestations are more common in the Harlem area of Manhattan.*
-
 :::
 
 ::: {.column width="50%"}
-
 ```{r}
 #| echo: false
 #| warning: false
@@ -461,15 +445,11 @@ a
 ```
 
 ***Figure 2d**: Fly Infestations are also more common in the Harlem Area.*
-
+:::
 :::
 
-:::
-
-::: {.columns}
-
+::: columns
 ::: {.column width="50%"}
-
 ```{r}
 #| echo: false
 #| warning: false
@@ -550,11 +530,9 @@ b
 ```
 
 ***Figure 3a**: Restaurant cuisines with the most percentage of Rat violations by zipcode are more varied.*
-
 :::
 
 ::: {.column width="50%"}
-
 ```{r}
 #| echo: false
 #| warning: false
@@ -635,17 +613,13 @@ b
 ```
 
 ***Figure 3b:** American cuisine is the cuisine with the most percent of Mouse Violations in Downtown New York.*
-
 :::
-
 :::
 
 Figures 3a-d show which cuisines have the most percentage of restaurants with the specified pest violation by zipcode. These results might give some insight into which cuisines' ingredients the pests find most attractive and/or which cuisines' restaurant establishments are most out of shape.
 
-::: {.columns}
-
+::: columns
 ::: {.column width="50%"}
-
 ```{r}
 #| echo: false
 #| warning: false
@@ -726,11 +700,9 @@ b
 ```
 
 **Figure 3c**: *Restaurant cuisines with the most percentage of Roach violations by zipcode are also very varied.*
-
 :::
 
 ::: {.column width="50%"}
-
 ```{r}
 #| echo: false
 #| warning: false
@@ -812,9 +784,7 @@ b
 ```
 
 ***Figure 3d**: American cuisine is also the cuisine with the most percent of Fly Violations in Downtown New York.*
-
 :::
-
 :::
 
 Figures 4a-d show the percent of restaurants that have a specified pest infestation by cuisine. This information can help restaurant inspectors prepare for inspections.
@@ -962,7 +932,7 @@ Figure 4d: *Creole/Cajun cuisine is most likely to have a Rat Violation because 
 
 #### Statistical Tests
 
-![](images/Screenshot 2024-08-15 at 7.32.33 AM.png){fig-align="center"}
+![](images/Screenshot%202024-08-15%20at%207.32.33%20AM.png){fig-align="center"}
 
 **Cuisine from Pest Violation Type**
 
@@ -1128,8 +1098,8 @@ ggplot(anova_graph, aes(x = violation_codes, y = p_values, fill = violation_code
 The table below shows which Other Violation Types that a restaurant has that makes it more likely to harbor Rats, Mice, Roaches, or Flies.
 
 | Violation                                                                           | Pest Violations            | P-Values                                       |
-|-----------------|------------------------------|--------------------------|
-|  Food not protected from cross-contamination                                        | Rats, Roaches, Flies       | 0.005091, 0.008444, 6.159e-05                  |
+|-------------------------------------------------------------------------------------|----------------------------|------------------------------------------------|
+| Food not protected from cross-contamination                                         | Rats, Roaches, Flies       | 0.005091, 0.008444, 6.159e-05                  |
 | Culinary sink or alternative method not provided for washing food                   | Rats                       | 0.0007472                                      |
 | Hand washing facilities not provided or not located where required                  | Rats, Roaches, Flies       | 0.01913, 0.0007209, 0.02828                    |
 | Food not properly protected when stored                                             | Roaches                    | 0.003129                                       |
